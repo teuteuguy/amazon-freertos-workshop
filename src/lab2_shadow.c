@@ -1,5 +1,5 @@
 /**
- * @file m5stickc_lab2_shadow.h
+ * @file lab2_shadow.c
  * @brief Lab2: Demonstrates using the IoT Core Shadow.
  *
  * (C) 2019 - Timothee Cruse <timothee.cruse@gmail.com>
@@ -35,13 +35,13 @@
 #include "types/iot_network_types.h"
 #include "esp_log.h"
 
-#include "m5stickc_lab_config.h"
-#include "m5stickc_lab_connection.h"
-#include "m5stickc_lab2_shadow.h"
+#include "lab_config.h"
+#include "lab_connection.h"
+#include "lab2_shadow.h"
 
 #include "m5stickc.h"
 
-static const char *TAG = "m5stickc_lab2_shadow";
+static const char *TAG = "lab2_shadow";
 
 /**
  * @brief The timeout for MQTT operations.
@@ -145,7 +145,7 @@ void vLab2NetworkConnectedCallback(bool awsIotMqttMode,
 void vLab2NetworkDisconnectedCallback(const IotNetworkInterface_t *pNetworkInterface)
 {
     ESP_LOGI(TAG, "vNetworkDisconnectedCallback");
-    m5stickc_lab_connection_cleanup();
+    lab_connection_cleanup();
 }
 
 /*-----------------------------------------------------------*/
@@ -300,7 +300,7 @@ static int _reportShadow(const char *const pThingName)
 
     if (status == EXIT_SUCCESS)
     {
-        status = m5stickc_lab_connection_update_shadow(&updateDocument);
+        status = lab_connection_update_shadow(&updateDocument);
     }
 
     return status;
@@ -503,9 +503,9 @@ static void prvAirConTimerCallback(TimerHandle_t pxTimer)
 
 /*-----------------------------------------------------------*/
 
-void m5stickc_lab2_init(const char *const strID)
+void lab2_init(const char *const strID)
 {
-    static m5stickc_iot_connection_params_t connectionParams;
+    static iot_connection_params_t connectionParams;
 
     connectionParams.strID = (char *)strID;
     connectionParams.useShadow = true;
@@ -514,7 +514,7 @@ void m5stickc_lab2_init(const char *const strID)
     connectionParams.shadowDeltaCallback = _shadowDeltaCallback;
     connectionParams.shadowUpdatedCallback = _shadowUpdatedCallback;
 
-    m5stickc_lab_connection_init(&connectionParams);
+    lab_connection_init(&connectionParams);
 }
 
 /*-----------------------------------------------------------*/

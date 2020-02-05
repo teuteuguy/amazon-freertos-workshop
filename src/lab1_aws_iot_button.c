@@ -1,5 +1,5 @@
 /**
- * @file m5stickc_lab1_aws_iot_button.c
+ * @file lab1_aws_iot_button.c
  * @brief Lab1: Demonstrates the use of the MQTT library to publish on AWS IoT Core.
  *
  * (C) 2019 - Timothee Cruse <timothee.cruse@gmail.com>
@@ -29,16 +29,17 @@
 #include "types/iot_network_types.h"
 #include "esp_log.h"
 
-#include "m5stickc_lab_config.h"
-#include "m5stickc_lab_connection.h"
-#include "m5stickc_lab1_aws_iot_button.h"
+#include "lab_config.h"
+#include "lab_connection.h"
+#include "lab1_aws_iot_button.h"
 
 #include "m5stickc.h"
 
-static const char *TAG = "m5stickc_lab1_aws_iot_button";
+static const char *TAG = "lab1_aws_iot_button";
+
 
 #ifndef IOT_DEMO_MQTT_TOPIC_PREFIX
-    #define IOT_DEMO_MQTT_TOPIC_PREFIX "m5stickc"
+    #define IOT_DEMO_MQTT_TOPIC_PREFIX "mydevice"
 #endif
 /** @endcond */
 
@@ -54,7 +55,7 @@ static const char *TAG = "m5stickc_lab1_aws_iot_button";
  * This prefix is also used to generate topic names and topic filters used in this
  * demo.
  */
-#define CLIENT_IDENTIFIER_PREFIX                 "m5stickc"
+#define CLIENT_IDENTIFIER_PREFIX                 "mydevice"
 
 /**
  * @brief The longest client identifier that an MQTT server must accept (as defined
@@ -229,57 +230,33 @@ static int _publishMessage( const char * pTopicName,
     publishInfo.retryMs = PUBLISH_RETRY_MS;
     publishInfo.retryLimit = PUBLISH_RETRY_LIMIT;
 
-    status = m5stickc_lab_connection_publish(&publishInfo, &publishComplete);
+    status = lab_connection_publish(&publishInfo, &publishComplete);
 
     return status;
 }
 
 /*-----------------------------------------------------------*/
 
-void m5stickc_lab1_init(const char *const strID)
+void lab1_init(const char *const strID)
 {
-    static m5stickc_iot_connection_params_t connectionParams;
+    static iot_connection_params_t connectionParams;
 
     connectionParams.strID = (char *)strID;
     connectionParams.useShadow = false;
     connectionParams.networkConnectedCallback = vLab1NetworkConnectedCallback;
     connectionParams.networkDisconnectedCallback = vLab1NetworkDisconnectedCallback;
 
-    m5stickc_lab_connection_init(&connectionParams);
+    lab_connection_init(&connectionParams);
 }
 
-// void m5stickc_lab1_init1(void) 
-// {
-//     static demoContext_t mqttDemoContext =
-//         {
-//             .networkTypes = democonfigNETWORK_TYPES,
-//             .demoFunction = m5stickc_lab1_aws_iot_button,
-//             .networkConnectedCallback = vNetworkConnectedCallback,
-//             .networkDisconnectedCallback = vNetworkDisconnectedCallback
-//         };
-
-//     // Create semaphore for connection readiness
-//     if ( !IotSemaphore_Create( &connectionReadySem, 0, 1 ) )
-//     {
-//         IotLogError("Failed to create connection semaphore!");
-//     }
-    
-//     // Create semaphore for connection readiness
-//     if ( !IotSemaphore_Create( &cleanUpReadySem, 0, 1 ) )
-//     {
-//         IotLogError("Failed to create clean up semaphore!");
-//     }
-
-//     Iot_CreateDetachedThread(runDemoTask, &mqttDemoContext, democonfigDEMO_PRIORITY, democonfigDEMO_STACKSIZE);    
-// }
 
 /*-----------------------------------------------------------*/
 
-void m5stickc_lab1_action( const char * strID, int32_t buttonID ) 
+void lab1_action( const char * strID, int32_t buttonID ) 
 {
-    ESP_LOGI(TAG, "m5stickc_lab1_action: %d", buttonID);
+    ESP_LOGI(TAG, "lab1_action: %d", buttonID);
 
-    m5stickc_lab_connection_ready_wait();
+    lab_connection_ready_wait();
     
     /* Topic and Payload buffers */
     char pTopic[ TOPIC_BUFFER_LENGTH ] = { 0 };

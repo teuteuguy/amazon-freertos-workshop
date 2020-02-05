@@ -76,7 +76,7 @@
 /* Demonstrate use of component foo. */
 #include <foo.h>
 
-#include "m5stickc_demo.h"
+#include "workshop.h"
 
 /* Logging Task Defines. */
 #define mainLOGGING_MESSAGE_QUEUE_LENGTH    ( 32 )

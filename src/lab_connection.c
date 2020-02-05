@@ -1,5 +1,5 @@
 /**
- * @file m5stickc_lab_connection.h
+ * @file lab_connection.h
  * @brief Connection code for the library to be used commonly accross the different labs.
  *
  * (C) 2019 - Timothee Cruse <timothee.cruse@gmail.com>
@@ -35,18 +35,18 @@
 #include "types/iot_network_types.h"
 #include "esp_log.h"
 
-#include "m5stickc_lab_config.h"
-#include "m5stickc_lab_connection.h"
+#include "lab_config.h"
+#include "lab_connection.h"
 
 #include "m5stickc.h"
 
 /*-----------------------------------------------------------*/
 
-static const char *TAG = "m5stickc_lab_connection";
+static const char *TAG = "lab_connection";
 
 /*-----------------------------------------------------------*/
 
-#define IOT_MQTT_TOPIC_PREFIX "m5stickc"
+#define IOT_MQTT_TOPIC_PREFIX "mydevice"
 
 /**
  * @brief The timeout for MQTT operations.
@@ -59,7 +59,7 @@ static const char *TAG = "m5stickc_lab_connection";
  *
  * This prefix is also used to generate topic names and topic filters used.
  */
-#define CLIENT_IDENTIFIER_PREFIX "m5stickc"
+#define CLIENT_IDENTIFIER_PREFIX "mydevice"
 
 /**
  * @brief The longest client identifier that an MQTT server must accept (as defined
@@ -112,7 +112,7 @@ static IotSemaphore_t shadowDeltaSem;
 /* Handle of the MQTT connection used in this demo. */
 static IotMqttConnection_t _mqttConnection = IOT_MQTT_CONNECTION_INITIALIZER;
 
-static m5stickc_iot_connection_params_t *_pConnectionParams = NULL;
+static iot_connection_params_t *_pConnectionParams = NULL;
 
 /* boolean flag for connection established */
 static bool connectionEstablished = false;
@@ -396,11 +396,11 @@ static int _establishMqttConnection(const char *pIdentifier,
  * @return `EXIT_SUCCESS` if the demo completes successfully; `EXIT_FAILURE` otherwise.
  */
 
-int m5stickc_lab_run(bool awsIotMqttMode,
-                     const char *pIdentifier,
-                     void *pNetworkServerInfo,
-                     void *pNetworkCredentialInfo,
-                     const IotNetworkInterface_t *pNetworkInterface)
+int lab_run(bool awsIotMqttMode,
+            const char *pIdentifier,
+            void *pNetworkServerInfo,
+            void *pNetworkCredentialInfo,
+            const IotNetworkInterface_t *pNetworkInterface)
 {
     /* Return value of this function and the exit status of this program. */
     int status = EXIT_SUCCESS;
@@ -501,7 +501,7 @@ int m5stickc_lab_run(bool awsIotMqttMode,
 
 /*-----------------------------------------------------------*/
 
-esp_err_t m5stickc_lab_connection_init(m5stickc_iot_connection_params_t * pConnectionParams)
+esp_err_t lab_connection_init(iot_connection_params_t * pConnectionParams)
 {
     esp_err_t res = EXIT_SUCCESS;
 
@@ -510,7 +510,7 @@ esp_err_t m5stickc_lab_connection_init(m5stickc_iot_connection_params_t * pConne
     static demoContext_t mqttDemoContext =
     {
         .networkTypes = democonfigNETWORK_TYPES,
-        .demoFunction = m5stickc_lab_run,
+        .demoFunction = lab_run,
         .networkConnectedCallback = NULL,
         .networkDisconnectedCallback = NULL
     };
@@ -550,7 +550,7 @@ esp_err_t m5stickc_lab_connection_init(m5stickc_iot_connection_params_t * pConne
 
 /*-----------------------------------------------------------*/
 
-esp_err_t m5stickc_lab_connection_update_shadow(AwsIotShadowDocumentInfo_t *updateDocument)
+esp_err_t lab_connection_update_shadow(AwsIotShadowDocumentInfo_t *updateDocument)
 {
     int status = EXIT_SUCCESS;
     AwsIotShadowError_t updateStatus = AWS_IOT_SHADOW_STATUS_PENDING;
@@ -580,7 +580,7 @@ esp_err_t m5stickc_lab_connection_update_shadow(AwsIotShadowDocumentInfo_t *upda
 
 /*-----------------------------------------------------------*/
 
-esp_err_t m5stickc_lab_connection_publish(IotMqttPublishInfo_t * publishInfo, IotMqttCallbackInfo_t * publishComplete)
+esp_err_t lab_connection_publish(IotMqttPublishInfo_t * publishInfo, IotMqttCallbackInfo_t * publishComplete)
 {
     int status = EXIT_SUCCESS;
     IotMqttError_t publishStatus = IOT_MQTT_STATUS_PENDING;
@@ -609,13 +609,13 @@ esp_err_t m5stickc_lab_connection_publish(IotMqttPublishInfo_t * publishInfo, Io
 }
 /*-----------------------------------------------------------*/
 
-void m5stickc_lab_connection_ready_wait(void)
+void lab_connection_ready_wait(void)
 {
     IotSemaphore_Wait( &connectionReadySem );
     IotSemaphore_Post( &connectionReadySem );
 }
 
-void m5stickc_lab_connection_cleanup(void)
+void lab_connection_cleanup(void)
 {
     IotSemaphore_Post(&cleanUpReadySem);
 }
