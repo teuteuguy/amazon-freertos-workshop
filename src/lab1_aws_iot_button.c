@@ -153,12 +153,12 @@ void vLab1NetworkConnectedCallback( bool awsIotMqttMode,
                                 void * pNetworkCredentialInfo,
                                 const IotNetworkInterface_t * pNetworkInterface )
 {
-    ESP_LOGD(TAG, "vNetworkConnectedCallback");
+    ESP_LOGI(TAG, "vNetworkConnectedCallback");
 }
 
 void vLab1NetworkDisconnectedCallback( const IotNetworkInterface_t * pNetworkInterface )
 {
-    ESP_LOGD(TAG, "vNetworkDisconnectedCallback");
+    ESP_LOGI(TAG, "vNetworkDisconnectedCallback");
 }
 
 /*-----------------------------------------------------------*/

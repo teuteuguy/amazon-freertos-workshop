@@ -244,7 +244,7 @@ static int _setShadowCallbacks(const char *pThingName)
 /*-----------------------------------------------------------*/
 
 /**
- * @brief Establish a new connection to the MQTT server for the Shadow demo.
+ * @brief Establish a new connection to the MQTT server.
  *
  * @param[in] pIdentifier NULL-terminated MQTT client identifier. The Shadow
  * demo will use the Thing Name as the client identifier.
@@ -466,22 +466,26 @@ int lab_run(bool awsIotMqttMode,
     else
     {
         ESP_LOGE(TAG, "Failed to initialize the MQTT Connection: %i", status);
+        ESP_LOGE(TAG, "Exiting");
     }
 
-    // Unhook connection readiness semaphore
-    IotSemaphore_Post(&connectionReadySem);
-    // Unhook shadow delta semaphore
-    IotSemaphore_Post(&shadowDeltaSem);
+    if (status == EXIT_SUCCESS)
+    {
+        // Unhook connection readiness semaphore
+        IotSemaphore_Post(&connectionReadySem);
+        // Unhook shadow delta semaphore
+        IotSemaphore_Post(&shadowDeltaSem);
 
-    IotLogInfo("Waiting for connection clean up signal...");
-    // Wait for clean up semaphore
-    IotSemaphore_Wait(&cleanUpReadySem);
-    IotSemaphore_Destroy(&cleanUpReadySem);
+        IotLogInfo("Waiting for connection clean up signal...");
+        // Wait for clean up semaphore
+        IotSemaphore_Wait(&cleanUpReadySem);
+        IotSemaphore_Destroy(&cleanUpReadySem);
 
-    IotLogInfo("Received connection clean up signal.");
+        IotLogInfo("Received connection clean up signal.");
 
-    // Cleanup shadow delta semaphore
-    IotSemaphore_Destroy(&shadowDeltaSem);
+        // Cleanup shadow delta semaphore
+        IotSemaphore_Destroy(&shadowDeltaSem);
+    }
 
     /* Disconnect the MQTT connection if it was established. */
     if (connectionEstablished == true)

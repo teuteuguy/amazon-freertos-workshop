@@ -33,9 +33,6 @@
 #include "workshop.h"
 
 /* Declaration of demo functions. */
-#if defined(LABCONFIG_LAB0_DEEP_SLEEP_BUTTON_WAKEUP) || defined(LABCONFIG_LAB1_AWS_IOT_BUTTON)
-#include "lab0_sleep.h"
-#endif // LABCONFIG_LAB0_DEEP_SLEEP_BUTTON_WAKEUP || LABCONFIG_LAB1_AWS_IOT_BUTTON
 #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
 #include "lab1_aws_iot_button.h"
 #endif // LABCONFIG_LAB1_AWS_IOT_BUTTON || LABCONFIG_LAB2_SHADOW
@@ -61,9 +58,6 @@ esp_err_t draw_battery_level(void);
 void battery_refresh_timer_init(void);
 
 esp_err_t workshop_init(void);
-
-static esp_err_t prvDeepSleep( gpio_num_t wakeup_pin );
-static void prvSleepTimerCallback( TimerHandle_t pxTimer );
 
 #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
 
@@ -115,19 +109,11 @@ void button_event_handler(void * handler_arg, esp_event_base_t base, int32_t id,
             ESP_LOGI(TAG, "Button A Held");            
         }
         
-#ifdef LABCONFIG_LAB1_AWS_IOT_BUTTON
-        lab0_event();
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON
-
 #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
         IotSemaphore_Wait(&lab1_semaphore);
         lab1_action(strMACAddr, id);
         IotSemaphore_Post(&lab1_semaphore);
 #endif // LABCONFIG_LAB1_AWS_IOT_BUTTON || LABCONFIG_LAB2_SHADOW
-
-#if defined(LABCONFIG_LAB0_DEEP_SLEEP_BUTTON_WAKEUP) || defined(LABCONFIG_LAB1_AWS_IOT_BUTTON)
-        lab0_event();
-#endif // LABCONFIG_LAB0_DEEP_SLEEP_BUTTON_WAKEUP || LABCONFIG_LAB1_AWS_IOT_BUTTON
 
     }
 
@@ -179,10 +165,9 @@ esp_err_t workshop_init(void)
     TFT_print((char *)"Amazon FreeRTOS", CENTER, SCREEN_LINE_1);
     TFT_print((char *)"workshop", CENTER, SCREEN_LINE_2);
 
-#ifdef LABCONFIG_LAB0_DEEP_SLEEP_BUTTON_WAKEUP
-    TFT_print((char *)"LAB0 - SETUP & SLEEP", CENTER, SCREEN_LINE_4);
-    lab0_init( prvSleepTimerCallback );
-#endif // LABCONFIG_LAB0_DEEP_SLEEP_BUTTON_WAKEUP
+#ifdef LABCONFIG_LAB0_SETUP
+    TFT_print((char *)"LAB0 - SETUP", CENTER, SCREEN_LINE_4);
+#endif // LABCONFIG_LAB0_SETUP
 
 #ifdef LABCONFIG_LAB1_AWS_IOT_BUTTON
     TFT_print((char *)"LAB1 - AWS IOT BUTTON", CENTER, SCREEN_LINE_4);
@@ -251,10 +236,6 @@ esp_err_t workshop_init(void)
     }
 
 #endif // LABCONFIG_LAB1_AWS_IOT_BUTTON
-
-#if defined(LABCONFIG_LAB0_DEEP_SLEEP_BUTTON_WAKEUP) || defined(LABCONFIG_LAB1_AWS_IOT_BUTTON)
-    lab0_init( prvSleepTimerCallback );
-#endif // LABCONFIG_LAB0_DEEP_SLEEP_BUTTON_WAKEUP || LABCONFIG_LAB1_AWS_IOT_BUTTON
 
     return res;
 }
@@ -325,48 +306,3 @@ void battery_refresh_timer_init(void)
 
 /*-----------------------------------------------------------*/
 
-static esp_err_t prvDeepSleep( gpio_num_t wakeup_pin )
-{
-    esp_err_t res = ESP_FAIL;
-
-#ifdef LABCONFIG_LAB1_AWS_IOT_BUTTON
-    lab_connection_cleanup();
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON
-
-    ESP_LOGI(TAG, "Going to DEEP SLEEP!");
-
-    res = esp_sleep_enable_ext0_wakeup( wakeup_pin, 0 );
-
-    if (res != ESP_OK)
-    {
-        return res;
-    }
-
-    res = m5power_set_sleep();
-    if (res == ESP_OK)
-    {
-        esp_deep_sleep_start();
-    }
-
-    return res;
-}
-
-static void prvSleepTimerCallback(TimerHandle_t pxTimer)
-{
-    esp_err_t res = ESP_FAIL;
-
-    ESP_LOGI(TAG, "Sleep timer callback!");
-
-#ifdef LABCONFIG_LAB1_AWS_IOT_BUTTON
-    
-    IotSemaphore_Wait( &lab1_semaphore );
-    
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON
-
-    res = prvDeepSleep( M5BUTTON_BUTTON_A_GPIO );
-
-    if (res != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Error setting deep sleep!");
-    }
-}
