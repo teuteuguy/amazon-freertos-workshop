@@ -14,7 +14,7 @@ A collection of labs designed to run on the M5StickC device. Includes multiple l
 
 ## Start
 
-The workshop documentation and content is located [here](https://teuteuguy.github.io/afmw-docs/)
+The workshop documentation and content is located [here](https://teuteuguy.github.io/amazon-freertos-workshop-docs/)
 
 ## Run
 
