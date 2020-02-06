@@ -57,6 +57,8 @@ char strMACAddr[MAC_ADDRESS_STR_LENGTH] = "";
 esp_err_t draw_battery_level(void);
 void battery_refresh_timer_init(void);
 
+void accel_timer_init(void);
+
 esp_err_t workshop_init(void);
 
 #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
@@ -97,14 +99,14 @@ esp_err_t workshop_run(void)
 
 void button_event_handler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
 {
-    if (base == M5BUTTON_A_EVENT_BASE )
+    if (base == M5STICKC_BUTTON_A_EVENT_BASE )
     {
 
-        if ( id == M5BUTTON_BUTTON_CLICK_EVENT )
+        if ( id == M5STICKC_BUTTON_CLICK_EVENT )
         {
             ESP_LOGI(TAG, "Button A Pressed");            
         }
-        if ( id == M5BUTTON_BUTTON_HOLD_EVENT )
+        if ( id == M5STICKC_BUTTON_HOLD_EVENT )
         {
             ESP_LOGI(TAG, "Button A Held");            
         }
@@ -117,7 +119,7 @@ void button_event_handler(void * handler_arg, esp_event_base_t base, int32_t id,
 
     }
 
-    if (base == M5BUTTON_B_EVENT_BASE && id == M5BUTTON_BUTTON_HOLD_EVENT) {
+    if (base == M5STICKC_BUTTON_B_EVENT_BASE && id == M5STICKC_BUTTON_HOLD_EVENT) {
         ESP_LOGI(TAG, "Button B Held");
         ESP_LOGI(TAG, "Restarting");
         esp_restart();
@@ -135,9 +137,11 @@ esp_err_t workshop_init(void)
     m5stickc_config.power.enable_lcd_backlight = false;
     m5stickc_config.power.lcd_backlight_level = 1;
 
-    res = m5_init(&m5stickc_config);
-    ESP_LOGI(TAG, "workshop_init: m5_init ...            %s", res == ESP_OK ? "OK" : "NOK");
+    res = M5StickCInit(&m5stickc_config);
+    ESP_LOGI(TAG, "workshop_init: M5StickCInit ...       %s", res == ESP_OK ? "OK" : "NOK");
     if (res != ESP_OK) return res;
+
+    accel_timer_init();
 
     TFT_FONT_ROTATE = 0;
     TFT_TEXT_WRAP = 0;
@@ -151,7 +155,7 @@ esp_err_t workshop_init(void)
     TFT_fillScreen(TFT_BLACK);
     TFT_FONT_BACKGROUND = TFT_BLACK;
     TFT_FONT_FOREGROUND = TFT_ORANGE;
-    res = m5display_on();
+    res = M5StickCDisplayOn();
     ESP_LOGI(TAG, "              LCD Backlight ON ...    %s", res == ESP_OK ? "OK" : "NOK");
     if (res != ESP_OK) return res;
 
@@ -178,16 +182,16 @@ esp_err_t workshop_init(void)
     lab2_init(strMACAddr);
 #endif // LABCONFIG_LAB2_SHADOW
 
-    TFT_drawLine(0, M5DISPLAY_HEIGHT - 13 - 3, M5DISPLAY_WIDTH, M5DISPLAY_HEIGHT - 13 - 3, TFT_ORANGE);
+    TFT_drawLine(0, M5STICKC_DISPLAY_HEIGHT - 13 - 3, M5STICKC_DISPLAY_WIDTH, M5STICKC_DISPLAY_HEIGHT - 13 - 3, TFT_ORANGE);
     
     res = draw_battery_level();
     battery_refresh_timer_init();
 
-    res = esp_event_handler_register_with(m5_event_loop, M5BUTTON_A_EVENT_BASE, ESP_EVENT_ANY_ID, button_event_handler, NULL);
+    res = esp_event_handler_register_with(m5stickc_event_event_loop, M5STICKC_BUTTON_A_EVENT_BASE, ESP_EVENT_ANY_ID, button_event_handler, NULL);
     ESP_LOGI(TAG, "              Button A registered ... %s", res == ESP_OK ? "OK" : "NOK");
     if (res != ESP_OK) return res;
 
-    res = esp_event_handler_register_with(m5_event_loop, M5BUTTON_B_EVENT_BASE, ESP_EVENT_ANY_ID, button_event_handler, NULL);
+    res = esp_event_handler_register_with(m5stickc_event_event_loop, M5STICKC_BUTTON_B_EVENT_BASE, ESP_EVENT_ANY_ID, button_event_handler, NULL);
     ESP_LOGI(TAG, "              Button B registered ... %s", res == ESP_OK ? "OK" : "NOK");
     if (res != ESP_OK) return res;
 
@@ -224,7 +228,7 @@ esp_err_t workshop_init(void)
         {
             // Woken up by our button
             ESP_LOGI( TAG, "                    Woken up by the button" );
-            lab1_action(strMACAddr, M5BUTTON_BUTTON_CLICK_EVENT);
+            lab1_action(strMACAddr, M5STICKC_BUTTON_CLICK_EVENT);
         }
         else
         {
@@ -252,8 +256,8 @@ esp_err_t draw_battery_level(void)
     uint16_t vbat = 0, vaps = 0, b, c, battery;
     char pVbatStr[11] = {0};
 
-    res = m5power_get_vbat(&vbat);
-    res |= m5power_get_vaps(&vaps);
+    res = M5StickCPowerGetVbat(&vbat);
+    res |= M5StickCPowerGetVaps(&vaps);
 
     if (res == ESP_OK)
     {
@@ -286,7 +290,7 @@ esp_err_t draw_battery_level(void)
         else
         {
             ESP_LOGD(TAG, "draw_battery_level: Charging str(%i): %s", status, pVbatStr);
-            TFT_print(pVbatStr, 1, M5DISPLAY_HEIGHT - 13);
+            TFT_print(pVbatStr, 1, M5STICKC_DISPLAY_HEIGHT - 13);
         }
     }
 
@@ -306,3 +310,34 @@ void battery_refresh_timer_init(void)
 
 /*-----------------------------------------------------------*/
 
+static const TickType_t xAccelTimerFrequency_ms = 1000UL;
+static TimerHandle_t xAccelTimer;
+
+static void prvAccelTimerCallback(TimerHandle_t pxTimer)
+{
+    float ax, ay, az, gx, gy, gz, t;
+    esp_err_t e;
+    e = M5StickCMPU6886GetAccelData( &ax, &ay, &az );
+    if (e != ESP_OK)
+    {
+        return;
+    }
+    e = M5StickCMPU6886GetGyroData( &gx, &gy, &gz );
+    if (e != ESP_OK)
+    {
+        return;
+    }
+    e = M5StickCMPU6886GetTempData( &t );
+    if (e != ESP_OK)
+    {
+        return;
+    }
+
+    ESP_LOGI(TAG, "MPU6886: %f, %f, %f, %f, %f, %f, %f", ax, ay, az, gx, gy, gz, t);
+}
+
+void accel_timer_init(void)
+{
+    xAccelTimer = xTimerCreate("xAccelTimer", pdMS_TO_TICKS(xAccelTimerFrequency_ms), pdTRUE, NULL, prvAccelTimerCallback);
+    xTimerStart(xAccelTimer, 0);
+}

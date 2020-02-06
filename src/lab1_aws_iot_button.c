@@ -265,11 +265,11 @@ void lab1_action( const char * strID, int32_t buttonID )
     /* Generate the payload for the PUBLISH. */
     int status = -1;
     
-    if ( buttonID == M5BUTTON_BUTTON_CLICK_EVENT ) 
+    if ( buttonID == M5STICKC_BUTTON_CLICK_EVENT ) 
     {
         status = snprintf( pPublishPayload, PUBLISH_PAYLOAD_BUFFER_LENGTH, PUBLISH_PAYLOAD_FORMAT_SINGLE, strID );
     }
-    if ( buttonID == M5BUTTON_BUTTON_HOLD_EVENT ) 
+    if ( buttonID == M5STICKC_BUTTON_HOLD_EVENT ) 
     {
         status = snprintf( pPublishPayload, PUBLISH_PAYLOAD_BUFFER_LENGTH, PUBLISH_PAYLOAD_FORMAT_HOLD, strID );
     }

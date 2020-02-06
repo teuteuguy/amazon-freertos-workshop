@@ -487,7 +487,7 @@ static void prvAirConTimerCallback(TimerHandle_t pxTimer)
 
     if (status >= 0)
     {
-        TFT_print(pAirConStr, M5DISPLAY_WIDTH - 6 * 9, M5DISPLAY_HEIGHT - 13);
+        TFT_print(pAirConStr, M5STICKC_DISPLAY_WIDTH - 6 * 9, M5STICKC_DISPLAY_HEIGHT - 13);
     }
     
     /* Report Shadow. */
