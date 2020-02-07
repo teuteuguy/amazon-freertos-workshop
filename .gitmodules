@@ -7,3 +7,8 @@
 	path = components/afr-m5stickc-bsp
 	url = https://github.com/teuteuguy/afr-m5stickc-bsp.git
 	branch = master
+
+[submodule "components/afr-m5stack-bsp"]
+	path = components/afr-m5stack-bsp
+	url = https://github.com/teuteuguy/afr-m5stack-bsp.git
+	branch = master
