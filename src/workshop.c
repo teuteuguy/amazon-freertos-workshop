@@ -57,7 +57,8 @@ char strMACAddr[MAC_ADDRESS_STR_LENGTH] = "";
 esp_err_t draw_battery_level(void);
 void battery_refresh_timer_init(void);
 
-void accel_timer_init(void);
+static TaskHandle_t xAccelerometerTaskHandle;
+static void prvAccelerometerTask( void *pvParameters );
 
 esp_err_t workshop_init(void);
 
@@ -141,7 +142,13 @@ esp_err_t workshop_init(void)
     ESP_LOGI(TAG, "workshop_init: M5StickCInit ...       %s", res == ESP_OK ? "OK" : "NOK");
     if (res != ESP_OK) return res;
 
-    accel_timer_init();
+    /* Create Accelerometer reading task. */
+	xTaskCreate( prvAccelerometerTask,			/* The function that implements the task. */
+				"AccelTask",    				/* The text name assigned to the task - for debug only as it is not used by the kernel. */
+				2048,		/* The size of the stack to allocate to the task. */
+				NULL,                           /* The parameter passed to the task - in this case the counter to increment. */
+				0,				                /* The priority assigned to the task. */
+				&xAccelerometerTaskHandle );	/* The task handle is used to obtain the name of the task. */
 
     TFT_FONT_ROTATE = 0;
     TFT_TEXT_WRAP = 0;
@@ -310,34 +317,39 @@ void battery_refresh_timer_init(void)
 
 /*-----------------------------------------------------------*/
 
-static const TickType_t xAccelTimerFrequency_ms = 1000UL;
-static TimerHandle_t xAccelTimer;
-
-static void prvAccelTimerCallback(TimerHandle_t pxTimer)
+static void prvAccelerometerTask( void *pvParameters )
 {
-    float ax, ay, az, gx, gy, gz, t;
-    esp_err_t e;
-    e = M5StickCMPU6886GetAccelData( &ax, &ay, &az );
-    if (e != ESP_OK)
-    {
-        return;
-    }
-    e = M5StickCMPU6886GetGyroData( &gx, &gy, &gz );
-    if (e != ESP_OK)
-    {
-        return;
-    }
-    e = M5StickCMPU6886GetTempData( &t );
-    if (e != ESP_OK)
-    {
-        return;
-    }
+    TickType_t xDelayTimeInTicks = pdMS_TO_TICKS( 1000 );
 
-    ESP_LOGI(TAG, "MPU6886: %f, %f, %f, %f, %f, %f, %f", ax, ay, az, gx, gy, gz, t);
-}
+	for( ;; )
+	{
+        float ax, ay, az, gx, gy, gz, t, pitch, roll, yaw;
+        esp_err_t e;
+        e = M5StickCMPU6886GetAccelData( &ax, &ay, &az );
+        if (e != ESP_OK)
+        {
+            return;
+        }
+        e = M5StickCMPU6886GetGyroData( &gx, &gy, &gz );
+        if (e != ESP_OK)
+        {
+            return;
+        }
+        e = M5StickCMPU6886GetTempData( &t );
+        if (e != ESP_OK)
+        {
+            return;
+        }
+        e = M5StickCMPU6886GetAhrsData( &pitch, &roll, &yaw );
+        if (e != ESP_OK)
+        {
+            return;
+        }
 
-void accel_timer_init(void)
-{
-    xAccelTimer = xTimerCreate("xAccelTimer", pdMS_TO_TICKS(xAccelTimerFrequency_ms), pdTRUE, NULL, prvAccelTimerCallback);
-    xTimerStart(xAccelTimer, 0);
+        // ESP_LOGI(TAG, "MPU6886: Accel(%f, %f, %f)  Gyro(%f, %f, %f) Temp(%f) AHRS(%f, %f, %f)", ax, ay, az, gx, gy, gz, t, pitch, roll, yaw);
+        // vTaskDelay( xDelayTimeInTicks );
+	}
+
+    vTaskDelete( NULL );
 }
+/*-----------------------------------------------------------*/

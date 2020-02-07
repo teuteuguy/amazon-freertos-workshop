@@ -36,7 +36,11 @@ add_subdirectory(amazon-freertos)
 
 # Link against the mqtt demo so that we can use it. Dependencies of this demo are transitively
 # linked.
-target_link_libraries(afr_workshop PRIVATE AFR::demo_mqtt)
-target_link_libraries(afr_workshop PRIVATE AFR::shadow)
+target_link_libraries(afr_workshop 
+    PRIVATE 
+        AFR::demo_ble_numeric_comparison
+        AFR::demo_mqtt
+        AFR::shadow
+)
 
 
