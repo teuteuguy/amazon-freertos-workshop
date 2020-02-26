@@ -16,7 +16,7 @@ set(IDF_PROJECT_EXECUTABLE afr_workshop)
 # to collect extra components.
 get_filename_component(
     EXTRA_COMPONENT_DIRS
-    "components/foo" ABSOLUTE
+    "components/dummy" ABSOLUTE
 )
 list(APPEND IDF_EXTRA_COMPONENT_DIRS ${EXTRA_COMPONENT_DIRS})
 get_filename_component(
