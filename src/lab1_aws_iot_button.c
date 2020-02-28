@@ -147,22 +147,6 @@ static const char *TAG = "lab1_aws_iot_button";
 
 /*-----------------------------------------------------------*/
 
-void vLab1NetworkConnectedCallback( bool awsIotMqttMode,
-                                const char * pIdentifier,
-                                void * pNetworkServerInfo,
-                                void * pNetworkCredentialInfo,
-                                const IotNetworkInterface_t * pNetworkInterface )
-{
-    ESP_LOGI(TAG, "vNetworkConnectedCallback");
-}
-
-void vLab1NetworkDisconnectedCallback( const IotNetworkInterface_t * pNetworkInterface )
-{
-    ESP_LOGI(TAG, "vNetworkDisconnectedCallback");
-}
-
-/*-----------------------------------------------------------*/
-
 /**
  * @brief Called by the MQTT library when an operation completes.
  *
@@ -243,8 +227,8 @@ void lab1_init(const char *const strID)
 
     connectionParams.strID = (char *)strID;
     connectionParams.useShadow = false;
-    connectionParams.networkConnectedCallback = vLab1NetworkConnectedCallback;
-    connectionParams.networkDisconnectedCallback = vLab1NetworkDisconnectedCallback;
+    connectionParams.networkConnectedCallback = NULL;
+    connectionParams.networkDisconnectedCallback = NULL;
 
     lab_connection_init(&connectionParams);
 }
@@ -254,44 +238,49 @@ void lab1_init(const char *const strID)
 
 void lab1_action( const char * strID, int32_t buttonID ) 
 {
-    ESP_LOGI(TAG, "lab1_action: %d", buttonID);
-
-    lab_connection_ready_wait();
-    
-    /* Topic and Payload buffers */
-    char pTopic[ TOPIC_BUFFER_LENGTH ] = { 0 };
-    char pPublishPayload[ PUBLISH_PAYLOAD_BUFFER_LENGTH ] = { 0 };
-
-    /* Generate the payload for the PUBLISH. */
-    int status = -1;
-    
-    if ( buttonID == M5STICKC_BUTTON_CLICK_EVENT ) 
+    if (is_lab_connection_mqtt_connected())
     {
-        status = snprintf( pPublishPayload, PUBLISH_PAYLOAD_BUFFER_LENGTH, PUBLISH_PAYLOAD_FORMAT_SINGLE, strID );
-    }
-    if ( buttonID == M5STICKC_BUTTON_HOLD_EVENT ) 
-    {
-        status = snprintf( pPublishPayload, PUBLISH_PAYLOAD_BUFFER_LENGTH, PUBLISH_PAYLOAD_FORMAT_HOLD, strID );
-    }
+        ESP_LOGI(TAG, "lab1_action: %d", buttonID);
+        
+        /* Topic and Payload buffers */
+        char pTopic[ TOPIC_BUFFER_LENGTH ] = { 0 };
+        char pPublishPayload[ PUBLISH_PAYLOAD_BUFFER_LENGTH ] = { 0 };
 
-    /* Check for errors from snprintf. */
-    if( status < 0 )
-    {
-        IotLogError( "Failed to generate MQTT PUBLISH payload: %d.", (int) status );
+        /* Generate the payload for the PUBLISH. */
+        int status = -1;
+        
+        if ( buttonID == M5STICKC_BUTTON_CLICK_EVENT ) 
+        {
+            status = snprintf( pPublishPayload, PUBLISH_PAYLOAD_BUFFER_LENGTH, PUBLISH_PAYLOAD_FORMAT_SINGLE, strID );
+        }
+        if ( buttonID == M5STICKC_BUTTON_HOLD_EVENT ) 
+        {
+            status = snprintf( pPublishPayload, PUBLISH_PAYLOAD_BUFFER_LENGTH, PUBLISH_PAYLOAD_FORMAT_HOLD, strID );
+        }
+
+        /* Check for errors from snprintf. */
+        if( status < 0 )
+        {
+            IotLogError( "Failed to generate MQTT PUBLISH payload: %d.", (int) status );
+        }
+        else
+        {
+            /* Generate the topic. */
+            status = snprintf( pTopic, TOPIC_BUFFER_LENGTH, TOPIC_FORMAT, strID );
+
+        }
+        
+        if ( status < 0 ) 
+        {
+            IotLogError( "Failed to generate MQTT payload topic: %d.", (int) status );
+        }
+        
+        _publishMessage( pTopic, pPublishPayload );
     }
     else
     {
-        /* Generate the topic. */
-        status = snprintf( pTopic, TOPIC_BUFFER_LENGTH, TOPIC_FORMAT, strID );
-
+        ESP_LOGI(TAG, "lab1_action: %d. Skipped due to lack of MQTT connection", buttonID);
     }
-    
-    if ( status < 0 ) 
-    {
-        IotLogError( "Failed to generate MQTT payload topic: %d.", (int) status );
-    }
-    
-    _publishMessage( pTopic, pPublishPayload );
 }
 
 /*-----------------------------------------------------------*/

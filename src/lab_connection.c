@@ -35,6 +35,11 @@
 #include "types/iot_network_types.h"
 #include "esp_log.h"
 
+#include "iot_wifi.h"
+#include "iot_ble_config.h"
+
+#include "aws_iot_network_config.h"
+
 #include "lab_config.h"
 #include "lab_connection.h"
 
@@ -114,8 +119,30 @@ static IotMqttConnection_t _mqttConnection = IOT_MQTT_CONNECTION_INITIALIZER;
 
 static iot_connection_params_t *_pConnectionParams = NULL;
 
-/* boolean flag for connection established */
-static bool connectionEstablished = false;
+static bool mqttConnectionEstablished = false;
+
+/*-----------------------------------------------------------*/
+
+void vNetworkConnectedCallback( bool awsIotMqttMode,
+                                const char * pIdentifier,
+                                void * pNetworkServerInfo,
+                                void * pNetworkCredentialInfo,
+                                const IotNetworkInterface_t * pNetworkInterface )
+{
+    ESP_LOGI(TAG, "vNetworkConnectedCallback");
+    M5StickCLedSet(M5STICKC_LED_ON);
+}
+
+void vNetworkDisconnectedCallback( const IotNetworkInterface_t * pNetworkInterface )
+{
+    ESP_LOGI(TAG, "vNetworkDisconnectedCallback");
+    M5StickCLedSet(M5STICKC_LED_OFF);
+}
+
+void vMQTTDisconnectedCallback( const IotMqttCallbackParam_t * pIotMqttCallbackParam )
+{
+    ESP_LOGI(TAG, "vMQTTDisconnectedCallback");
+}
 
 /*-----------------------------------------------------------*/
 
@@ -125,7 +152,7 @@ static bool connectionEstablished = false;
  * @return `EXIT_SUCCESS` if all libraries were successfully initialized;
  * `EXIT_FAILURE` otherwise.
  */
-static int _initialize(void)
+static int _initializeLibraries(void)
 {
     int status = EXIT_SUCCESS;
     IotMqttError_t mqttInitStatus = IOT_MQTT_SUCCESS;
@@ -143,6 +170,7 @@ static int _initialize(void)
     }
     else
     {
+        ESP_LOGE(TAG, "_initialize: Failed to init MQTT Library");
         status = EXIT_FAILURE;
     }
 
@@ -154,6 +182,7 @@ static int _initialize(void)
 
         if (shadowInitStatus != AWS_IOT_SHADOW_SUCCESS)
         {
+            ESP_LOGE(TAG, "_initialize: Failed to init Shadow Library");
             status = EXIT_FAILURE;
         }
     }
@@ -267,40 +296,41 @@ static int _establishMqttConnection(const char *pIdentifier,
     IotMqttNetworkInfo_t networkInfo = IOT_MQTT_NETWORK_INFO_INITIALIZER;
     IotMqttConnectInfo_t connectInfo = IOT_MQTT_CONNECT_INFO_INITIALIZER;
     IotMqttPublishInfo_t lwtInfo = IOT_MQTT_PUBLISH_INFO_INITIALIZER;
+    IotMqttCallbackInfo_t disconnectInfo = {
+        .pCallbackContext = NULL,
+        .function = vMQTTDisconnectedCallback
+    };
     char pClientIdentifierBuffer[CLIENT_IDENTIFIER_MAX_LENGTH] = {0};
     char pLwtBuffer[LWT_TOPIC_NAME_MAX_LENGTH] = {0};
 
-    if (status == EXIT_SUCCESS)
-    {
-        /* Set the members of the network info not set by the initializer. This
-         * struct provided information on the transport layer to the MQTT connection. */
-        networkInfo.createNetworkConnection = true;
-        networkInfo.u.setup.pNetworkServerInfo = pNetworkServerInfo;
-        networkInfo.u.setup.pNetworkCredentialInfo = pNetworkCredentialInfo;
-        networkInfo.pNetworkInterface = pNetworkInterface;
+    /* Set the members of the network info not set by the initializer. This
+     * struct provided information on the transport layer to the MQTT connection. */
+    networkInfo.createNetworkConnection = true;
+    networkInfo.u.setup.pNetworkServerInfo = pNetworkServerInfo;
+    networkInfo.u.setup.pNetworkCredentialInfo = pNetworkCredentialInfo;
+    networkInfo.pNetworkInterface = pNetworkInterface;
+    networkInfo.disconnectCallback = disconnectInfo;
 
-#if (IOT_MQTT_ENABLE_SERIALIZER_OVERRIDES == 1) && defined(IOT_DEMO_MQTT_SERIALIZER)
+    #if (IOT_MQTT_ENABLE_SERIALIZER_OVERRIDES == 1) && defined(IOT_DEMO_MQTT_SERIALIZER)
         networkInfo.pMqttSerializer = IOT_DEMO_MQTT_SERIALIZER;
-#endif
+    #endif
 
-        /* Set the members of the connection info not set by the initializer. */
-        connectInfo.awsIotMqttMode = true;
-        connectInfo.cleanSession = true;
-        connectInfo.keepAliveSeconds = KEEP_ALIVE_SECONDS;
-        connectInfo.pWillInfo = &lwtInfo;
+    /* Set the members of the connection info not set by the initializer. */
+    connectInfo.awsIotMqttMode = true;
+    connectInfo.cleanSession = true;
+    connectInfo.keepAliveSeconds = KEEP_ALIVE_SECONDS;
+    connectInfo.pWillInfo = &lwtInfo;
 
-        status = snprintf(pLwtBuffer,
-                          LWT_TOPIC_NAME_MAX_LENGTH,
-                          LWT_TOPIC_NAME_FORMAT,
-                          _pConnectionParams->strID);
-
-    }
+    status = snprintf(pLwtBuffer,
+                        LWT_TOPIC_NAME_MAX_LENGTH,
+                        LWT_TOPIC_NAME_FORMAT,
+                        _pConnectionParams->strID);
 
     /* Check for errors from snprintf. */
     if (status < 0)
     {
         ESP_LOGE(TAG, "Failed to generate the LWT topic name.");
-        status = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
     else
     {
@@ -318,8 +348,7 @@ static int _establishMqttConnection(const char *pIdentifier,
     if (_pConnectionParams->useShadow == true && pIdentifier == NULL)
     {
         ESP_LOGE(TAG, "Shadow Thing Name must be provided.");
-
-        status = EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
 
     /* Use the parameter client identifier if provided. Otherwise, generate a
@@ -332,8 +361,8 @@ static int _establishMqttConnection(const char *pIdentifier,
     else
     {
         /* Every active MQTT connection must have a unique client identifier. The demos
-            * generate this unique client identifier by appending a timestamp to a common
-            * prefix. */
+         * generate this unique client identifier by appending a timestamp to a common
+         * prefix. */
         status = snprintf(pClientIdentifierBuffer,
                             CLIENT_IDENTIFIER_MAX_LENGTH,
                             CLIENT_IDENTIFIER_PREFIX "%lu",
@@ -343,7 +372,7 @@ static int _establishMqttConnection(const char *pIdentifier,
         if (status < 0)
         {
             IotLogError("Failed to generate unique client identifier for demo.");
-            status = EXIT_FAILURE;
+            return EXIT_FAILURE;
         }
         else
         {
@@ -370,9 +399,7 @@ static int _establishMqttConnection(const char *pIdentifier,
 
         if (connectStatus != IOT_MQTT_SUCCESS)
         {
-            IotLogError("MQTT CONNECT returned error %s.",
-                        IotMqtt_strerror(connectStatus));
-
+            IotLogError("MQTT CONNECT returned error %s.", IotMqtt_strerror(connectStatus));
             status = EXIT_FAILURE;
         }
     }
@@ -381,6 +408,59 @@ static int _establishMqttConnection(const char *pIdentifier,
 }
 
 /*-----------------------------------------------------------*/
+
+uint32_t _getSavedWifiNetworks( void )
+{
+    uint32_t idx;
+    WIFIReturnCode_t WifiRet;
+    WIFINetworkProfile_t profile;
+
+    ESP_LOGI(TAG, "Reading stored WIFI creds:");
+
+    for( idx = 0; idx < IOT_BLE_WIFI_PROVISIONING_MAX_SAVED_NETWORKS; idx++ )
+    {
+        WifiRet = WIFI_NetworkGet( &profile, idx );
+
+        if( WifiRet != eWiFiSuccess )
+        {
+            break;
+        }
+
+        ESP_LOGI(TAG, "  - %d: %s", idx, profile.cSSID);
+    }
+
+    return idx;
+}
+
+/*-----------------------------------------------------------*/
+
+void resetStoredWifiNetworks( void )
+{
+    uint32_t idx;
+    WIFIReturnCode_t WifiRet;
+    WIFINetworkProfile_t profile;
+
+    ESP_LOGI(TAG, "Deleting stored WIFI creds:");
+
+    for( idx = 0; idx < IOT_BLE_WIFI_PROVISIONING_MAX_SAVED_NETWORKS; idx++ )
+    {
+        WifiRet = WIFI_NetworkGet( &profile, idx );
+
+        if( WifiRet != eWiFiSuccess )
+        {
+            break;
+        }
+
+        WifiRet = WIFI_NetworkDelete( idx );
+
+        ESP_LOGI(TAG, "Deleting WIFI - %d: %s", idx, profile.cSSID);
+    }
+
+    return idx;
+}
+
+/*-----------------------------------------------------------*/
+
 /**
  * @brief The function that runs the MQTT demo, called by the demo runner.
  *
@@ -402,105 +482,135 @@ int lab_run(bool awsIotMqttMode,
             void *pNetworkCredentialInfo,
             const IotNetworkInterface_t *pNetworkInterface)
 {
-    /* Return value of this function and the exit status of this program. */
-    int status = EXIT_SUCCESS;
 
-    /* Flags for tracking which cleanup functions must be called. */
-    bool librariesInitialized = false;
+    for(;;)
+    {        
+        /* Return value of this function and the exit status of this program. */
+        int status = EXIT_SUCCESS;
 
-    connectionEstablished = false;
+        /* Flags for tracking which cleanup functions must be called. */
+        bool librariesInitialized = false;
+        
+        mqttConnectionEstablished = false;
 
-    /* The first parameter of this demo function is not used. Shadows are specific
-     * to AWS IoT, so this value is hardcoded to true whenever needed. */
-    (void)awsIotMqttMode;
+        /* The first parameter of this demo function is not used. Shadows are specific
+        * to AWS IoT, so this value is hardcoded to true whenever needed. */
+        (void)awsIotMqttMode;
 
-    /* Determine the length of the Thing Name. */
-    if (pIdentifier != NULL)
-    {
-        int thingNameLength = strlen(pIdentifier);
-
-        if (thingNameLength == 0)
+        /* Determine the length of the Thing Name. */
+        if (pIdentifier != NULL)
         {
-            IotLogError("The length of the Thing Name (identifier) must be nonzero.");
+            int thingNameLength = strlen(pIdentifier);
 
+            if (thingNameLength == 0)
+            {
+                ESP_LOGE(TAG, "Lab - The length of the Thing Name (identifier) must be nonzero.");
+                status = EXIT_FAILURE;
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Lab - A Thing Name (identifier) must be provided for the Shadow demo.");
             status = EXIT_FAILURE;
         }
+
+        if (status != EXIT_FAILURE)
+        {
+            uint32_t nbSavedWifiNetworks = _getSavedWifiNetworks();
+
+            ESP_LOGI(TAG, "Lab - Start");
+
+            /* Initialize the libraries required for this demo. */
+            status = _initializeLibraries();
+
+            if (status == EXIT_SUCCESS)
+            {
+                /* Mark the libraries as initialized. */
+                librariesInitialized = true;
+
+                ESP_LOGI(TAG, "Lab - Libraries initialized");
+
+                /* Establish a new MQTT connection. */
+                status = _establishMqttConnection(pIdentifier,
+                                                pNetworkServerInfo,
+                                                pNetworkCredentialInfo,
+                                                pNetworkInterface);
+            }
+            else
+            {
+                ESP_LOGE(TAG, "Lab - Failed to initialize the libraries: %i", status);
+                return status;
+            }
+
+            if (status == EXIT_SUCCESS)
+            {
+                /* Mark the MQTT connection as established. */
+                mqttConnectionEstablished = true;
+
+                ESP_LOGI(TAG, "Lab - MQTT Connection established");
+
+                /* Set the Shadow callbacks for this demo. */
+                status = _setShadowCallbacks(pIdentifier);
+            }
+            else
+            {
+                ESP_LOGE(TAG, "Lab - Failed to initialize the MQTT Connection: %i", status);
+            }
+
+            if (status == EXIT_SUCCESS)
+            {
+                // Connection is ready
+                IotSemaphore_Post(&connectionReadySem);
+                // Shadow can be used
+                // TODO: remove this with a check that MQTT connection is live instead.
+                IotSemaphore_Post(&shadowDeltaSem);
+
+                ESP_LOGI(TAG, "Lab - Waiting for connection clean up signal...");
+                // Wait for clean up semaphore
+                IotSemaphore_Wait(&cleanUpReadySem);
+
+                ESP_LOGI(TAG, "Lab - Received connection clean up signal.");
+                
+                // Cleanup connection cleanup semaphore
+                IotSemaphore_Destroy(&cleanUpReadySem);
+                // Cleanup shadow delta semaphore
+                IotSemaphore_Destroy(&shadowDeltaSem);        
+            }
+
+            /* Disconnect the MQTT connection if it was established. */
+            if (mqttConnectionEstablished == true)
+            {
+                IotMqtt_Disconnect(_mqttConnection, 0);
+                mqttConnectionEstablished = false;
+            }
+
+            /* Clean up libraries if they were initialized. */
+            if (librariesInitialized == true)
+            {
+                ESP_LOGI(TAG, "Lab - Cleaning up");
+                _cleanup();
+            }
+
+        }
+
+        ESP_LOGI(TAG, "Lab - End, looping in 10secs");
+        vTaskDelay( pdMS_TO_TICKS( 10000 ) );
+
+        return status;
     }
-    else
-    {
-        IotLogError("A Thing Name (identifier) must be provided for the Shadow demo.");
+}
 
-        status = EXIT_FAILURE;
+/*-----------------------------------------------------------*/
+
+void vLabConnectionTask( void * pArgument )
+{
+    for(;;)
+    {        
+        ESP_LOGI(TAG, "Connection - Start");
+        runDemoTask( pArgument );
+        ESP_LOGI(TAG, "Connection - End (Looping in 5secs)");
+        vTaskDelay( pdMS_TO_TICKS( 5000 ) );
     }
-
-    if (status == EXIT_SUCCESS)
-    {
-        /* Initialize the libraries required for this demo. */
-        status = _initialize();
-    }
-
-    if (status == EXIT_SUCCESS)
-    {
-        /* Mark the libraries as initialized. */
-        librariesInitialized = true;
-
-        /* Establish a new MQTT connection. */
-        status = _establishMqttConnection(pIdentifier,
-                                          pNetworkServerInfo,
-                                          pNetworkCredentialInfo,
-                                          pNetworkInterface);
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Failed to initialize: %i", status);
-    }
-
-    if (status == EXIT_SUCCESS)
-    {
-        /* Mark the MQTT connection as established. */
-        connectionEstablished = true;
-
-        /* Set the Shadow callbacks for this demo. */
-        status = _setShadowCallbacks(pIdentifier);
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Failed to initialize the MQTT Connection: %i", status);
-        ESP_LOGE(TAG, "Exiting");
-    }
-
-    if (status == EXIT_SUCCESS)
-    {
-        // Unhook connection readiness semaphore
-        IotSemaphore_Post(&connectionReadySem);
-        // Unhook shadow delta semaphore
-        IotSemaphore_Post(&shadowDeltaSem);
-
-        IotLogInfo("Waiting for connection clean up signal...");
-        // Wait for clean up semaphore
-        IotSemaphore_Wait(&cleanUpReadySem);
-        IotSemaphore_Destroy(&cleanUpReadySem);
-
-        IotLogInfo("Received connection clean up signal.");
-
-        // Cleanup shadow delta semaphore
-        IotSemaphore_Destroy(&shadowDeltaSem);
-    }
-
-    /* Disconnect the MQTT connection if it was established. */
-    if (connectionEstablished == true)
-    {
-        IotMqtt_Disconnect(_mqttConnection, 0);
-        connectionEstablished = false;
-    }
-
-    /* Clean up libraries if they were initialized. */
-    if (librariesInitialized == true)
-    {
-        _cleanup();
-    }
-
-    return status;
 }
 
 /*-----------------------------------------------------------*/
@@ -513,14 +623,21 @@ esp_err_t lab_connection_init(iot_connection_params_t * pConnectionParams)
 
     static demoContext_t mqttDemoContext =
     {
-        .networkTypes = democonfigNETWORK_TYPES,
+        .networkTypes = AWSIOT_NETWORK_TYPE_WIFI, //configENABLED_NETWORKS,
         .demoFunction = lab_run,
-        .networkConnectedCallback = NULL,
-        .networkDisconnectedCallback = NULL
+        .networkConnectedCallback = vNetworkConnectedCallback,
+        .networkDisconnectedCallback = vNetworkDisconnectedCallback
     };
-
-    mqttDemoContext.networkConnectedCallback = _pConnectionParams->networkConnectedCallback;
-    mqttDemoContext.networkDisconnectedCallback = _pConnectionParams->networkDisconnectedCallback;
+    
+    if ( _pConnectionParams->networkConnectedCallback != NULL )
+    {
+        mqttDemoContext.networkConnectedCallback = _pConnectionParams->networkConnectedCallback;
+    }
+    
+    if ( _pConnectionParams->networkDisconnectedCallback != NULL )
+    {
+        mqttDemoContext.networkDisconnectedCallback = _pConnectionParams->networkDisconnectedCallback;
+    }
 
     // Create semaphore for connection readiness
     if (res == EXIT_SUCCESS && !IotSemaphore_Create(&connectionReadySem, 0, 1))
@@ -546,7 +663,7 @@ esp_err_t lab_connection_init(iot_connection_params_t * pConnectionParams)
     if ( res == EXIT_SUCCESS )
     {
         ESP_LOGI(TAG, "Creating IoT Thread");
-        res = Iot_CreateDetachedThread(runDemoTask, &mqttDemoContext, democonfigDEMO_PRIORITY, democonfigDEMO_STACKSIZE);        
+        res = Iot_CreateDetachedThread(vLabConnectionTask, &mqttDemoContext, tskIDLE_PRIORITY + 5, configMINIMAL_STACK_SIZE * 8);        
     }
 
     return res;
@@ -613,50 +730,13 @@ esp_err_t lab_connection_publish(IotMqttPublishInfo_t * publishInfo, IotMqttCall
 }
 /*-----------------------------------------------------------*/
 
-void lab_connection_ready_wait(void)
-{
-    IotSemaphore_Wait( &connectionReadySem );
-    IotSemaphore_Post( &connectionReadySem );
-}
-
 void lab_connection_cleanup(void)
 {
     IotSemaphore_Post(&cleanUpReadySem);
 }
 
-/**
- * @brief Try to delete any Shadow document in the cloud.
- *
- * @param[in] mqttConnection The MQTT connection used for Shadows.
- * @param[in] pThingName The Shadow Thing Name to delete.
- * @param[in] thingNameLength The length of `pThingName`.
- */
-// static void _clearShadowDocument(IotMqttConnection_t mqttConnection,
-//                                  const char *const pThingName,
-//                                  size_t thingNameLength)
-// {
-//     AwsIotShadowError_t deleteStatus = AWS_IOT_SHADOW_STATUS_PENDING;
 
-//     /* Delete any existing Shadow document so that this demo starts with an empty
-//      * Shadow. */
-//     deleteStatus = AwsIotShadow_TimedDelete(mqttConnection,
-//                                             pThingName,
-//                                             thingNameLength,
-//                                             0,
-//                                             TIMEOUT_MS);
-
-//     /* Check for return values of "SUCCESS" and "NOT FOUND". Both of these values
-//      * mean that the Shadow document is now empty. */
-//     if ((deleteStatus == AWS_IOT_SHADOW_SUCCESS) || (deleteStatus == AWS_IOT_SHADOW_NOT_FOUND))
-//     {
-//         IotLogInfo("Successfully cleared Shadow of %.*s.",
-//                    thingNameLength,
-//                    pThingName);
-//     }
-//     else
-//     {
-//         IotLogWarn("Shadow of %.*s not cleared.",
-//                    thingNameLength,
-//                    pThingName);
-//     }
-// }
+bool is_lab_connection_mqtt_connected(void)
+{
+    return mqttConnectionEstablished;
+}

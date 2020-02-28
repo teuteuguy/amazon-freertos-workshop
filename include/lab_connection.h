@@ -21,11 +21,20 @@ typedef struct {
     void (*shadowUpdatedCallback)(void *, AwsIotShadowCallbackParam_t *);
 } iot_connection_params_t;
 
+typedef int (* labRunFunction_t)( bool awsIotMqttMode,
+                                const char * pIdentifier,
+                                void * pNetworkServerInfo,
+                                void * pNetworkCredentialInfo,
+                                const IotNetworkInterface_t * pNetworkInterface );
+
 esp_err_t lab_connection_init(iot_connection_params_t * params);
-void lab_connection_ready_wait(void);
 void lab_connection_cleanup(void);
 
 esp_err_t lab_connection_update_shadow(AwsIotShadowDocumentInfo_t *updateDocument);
 esp_err_t lab_connection_publish(IotMqttPublishInfo_t *publishInfo, IotMqttCallbackInfo_t *publishComplete);
+
+void resetStoredWifiNetworks( void );
+
+bool is_lab_connection_mqtt_connected(void);
 
 #endif /* ifndef _LAB_CONNECTION_H_ */

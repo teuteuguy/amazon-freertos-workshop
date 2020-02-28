@@ -10,4 +10,11 @@
 
 void lab2_init(const char *const strID);
 
+#if defined(LAB_INIT)
+    #undef LAB_INIT
+    #define LAB_INIT lab2_init
+#endif
+
+
+
 #endif /* ifndef _LAB2_SHADOW_H_ */

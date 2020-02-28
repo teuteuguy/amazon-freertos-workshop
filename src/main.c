@@ -1,26 +1,9 @@
-/*
- * Amazon FreeRTOS V1.4.7
- * Copyright (C) 2018 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+/**
+ * @file main.c
+ * @brief Main file.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- * http://aws.amazon.com/freertos
- * http://www.FreeRTOS.org
+ * (C) 2019 - Timothee Cruse <timothee.cruse@gmail.com>
+ * This code is licensed under the MIT License.
  */
 
 #include "iot_config.h"
@@ -73,8 +56,8 @@
     #include "iot_ble_numericComparison.h"
 #endif
 
-/* Demonstrate use of component foo. */
-#include <foo.h>
+/* Demonstrate use of component dummy. */
+#include <dummy.h>
 
 #include "workshop.h"
 
@@ -83,7 +66,7 @@
 #define mainLOGGING_TASK_STACK_SIZE         ( configMINIMAL_STACK_SIZE * 4 )
 #define mainDEVICE_NICK_NAME                "Espressif_Demo"
 
-QueueHandle_t spp_uart_queue = NULL;
+/*-----------------------------------------------------------*/
 
 /* Static arrays for FreeRTOS+TCP stack initialization for Ethernet network connections
  * are use are below. If you are using an Ethernet connection on your MCU device it is
@@ -95,101 +78,67 @@ QueueHandle_t spp_uart_queue = NULL;
  */
 static void prvMiscInitialization( void );
 
+/*-----------------------------------------------------------*/
+
+extern void esp_vApplicationTickHook();
+void IRAM_ATTR vApplicationTickHook()
+{
+    esp_vApplicationTickHook();
+}
+
+/*-----------------------------------------------------------*/
+extern void esp_vApplicationIdleHook();
+void vApplicationIdleHook()
+{
+    esp_vApplicationIdleHook();
+}
+
+/*-----------------------------------------------------------*/
+
+void vApplicationDaemonTaskStartupHook( void )
+{
+}
+
+#if !AFR_ESP_LWIP
+    extern void vApplicationIPInit( void );
+
+    /*-----------------------------------------------------------*/
+
+    void vApplicationIPNetworkEventHook( eIPCallbackEvent_t eNetworkEvent )
+    {
+        uint32_t ulIPAddress, ulNetMask, ulGatewayAddress, ulDNSServerAddress;
+        system_event_t evt;
+
+        if( eNetworkEvent == eNetworkUp )
+        {
+            /* Print out the network configuration, which may have come from a DHCP
+            * server. */
+            FreeRTOS_GetAddressConfiguration(
+                &ulIPAddress,
+                &ulNetMask,
+                &ulGatewayAddress,
+                &ulDNSServerAddress );
+
+            evt.event_id = SYSTEM_EVENT_STA_GOT_IP;
+            evt.event_info.got_ip.ip_changed = true;
+            evt.event_info.got_ip.ip_info.ip.addr = ulIPAddress;
+            evt.event_info.got_ip.ip_info.netmask.addr = ulNetMask;
+            evt.event_info.got_ip.ip_info.gw.addr = ulGatewayAddress;
+            esp_event_send( &evt );
+        }
+    }
+#endif
+
+/*-----------------------------------------------------------*/
+
 #if BLE_ENABLED
-/* Initializes bluetooth */
+    /* Initializes bluetooth */
     static esp_err_t prvBLEStackInit( void );
     /** Helper function to teardown BLE stack. **/
     esp_err_t xBLEStackTeardown( void );
     static void spp_uart_init( void );
-#endif
 
-/*-----------------------------------------------------------*/
-
-/**
- * @brief Application runtime entry point.
- */
-int app_main( void )
-{
-    /* Perform any hardware initialization that does not require the RTOS to be
-     * running.  */
-
-    prvMiscInitialization();
-
-    if( SYSTEM_Init() == pdPASS )
-    {
-
-        configPRINTF( ( "Calling foo: %d\n", foo() ));
-
-        /* A simple example to demonstrate key and certificate provisioning in
-         * microcontroller flash using PKCS#11 interface. This should be replaced
-         * by production ready key provisioning mechanism. */
-        vDevModeKeyProvisioning();
-
-        #if BLE_ENABLED
-            /* Initialize BLE. */
-            ESP_ERROR_CHECK( esp_bt_controller_mem_release( ESP_BT_MODE_CLASSIC_BT ) );
-
-            if( prvBLEStackInit() != ESP_OK )
-            {
-                configPRINTF( ( "Failed to initialize the bluetooth stack\n " ) );
-
-                while( 1 )
-                {
-                }
-            }
-        #else
-            ESP_ERROR_CHECK( esp_bt_controller_mem_release( ESP_BT_MODE_CLASSIC_BT ) );
-            ESP_ERROR_CHECK( esp_bt_controller_mem_release( ESP_BT_MODE_BLE ) );
-        #endif /* if BLE_ENABLED */
-        /* Run all demos. */
-        DEMO_RUNNER_RunDemos();
-    }
-
-    /* Start the scheduler.  Initialization that requires the OS to be running,
-     * including the WiFi initialization, is performed in the RTOS daemon task
-     * startup hook. */
-    /* Following is taken care by initialization code in ESP IDF */
-    /* vTaskStartScheduler(); */
-    return 0;
-}
-
-/*-----------------------------------------------------------*/
-extern void vApplicationIPInit( void );
-static void prvMiscInitialization( void )
-{
-    /* Initialize NVS */
-    esp_err_t ret = nvs_flash_init();
-
-    if( ( ret == ESP_ERR_NVS_NO_FREE_PAGES ) || ( ret == ESP_ERR_NVS_NEW_VERSION_FOUND ) )
-    {
-        ESP_ERROR_CHECK( nvs_flash_erase() );
-        ret = nvs_flash_init();
-    }
-
-    ESP_ERROR_CHECK( ret );
-
-    #if BLE_ENABLED
-        NumericComparisonInit();
-        spp_uart_init();
-    #endif
-
-    /* Create tasks that are not dependent on the WiFi being initialized. */
-    xLoggingTaskInitialize( mainLOGGING_TASK_STACK_SIZE,
-                            tskIDLE_PRIORITY + 5,
-                            mainLOGGING_MESSAGE_QUEUE_LENGTH );
-
-#if AFR_ESP_LWIP
-    configPRINTF( ("Initializing lwIP TCP stack\r\n") );
-    tcpip_adapter_init();
-#else
-    configPRINTF( ("Initializing FreeRTOS TCP stack\r\n") );
-    vApplicationIPInit();
-#endif
-}
-
-/*-----------------------------------------------------------*/
-
-#if BLE_ENABLED
+    /*-----------------------------------------------------------*/
 
     #if CONFIG_NIMBLE_ENABLED == 1
         esp_err_t prvBLEStackInit( void )
@@ -254,11 +203,11 @@ static void prvMiscInitialization( void )
             return xRet;
         }
     #endif /* if CONFIG_NIMBLE_ENABLED == 1 */
-#endif /* if BLE_ENABLED */
 
-/*-----------------------------------------------------------*/
+    /*-----------------------------------------------------------*/
 
-#if BLE_ENABLED
+    QueueHandle_t spp_uart_queue = NULL;
+
     static void spp_uart_init( void )
     {
         uart_config_t uart_config =
@@ -279,7 +228,7 @@ static void prvMiscInitialization( void )
         uart_driver_install( UART_NUM_0, 4096, 8192, 10, &spp_uart_queue, 0 );
     }
 
-/*-----------------------------------------------------------*/
+    /*-----------------------------------------------------------*/
 
     BaseType_t getUserMessage( INPUTMessage_t * pxINPUTmessage,
                                TickType_t xAuthTimeout )
@@ -323,48 +272,86 @@ static void prvMiscInitialization( void )
 
 /*-----------------------------------------------------------*/
 
-extern void esp_vApplicationTickHook();
-void IRAM_ATTR vApplicationTickHook()
+/**
+ * @brief Application runtime entry point.
+ */
+int app_main( void )
 {
-    esp_vApplicationTickHook();
-}
+    /* Perform any hardware initialization that does not require the RTOS to be
+     * running.  */
 
-/*-----------------------------------------------------------*/
-extern void esp_vApplicationIdleHook();
-void vApplicationIdleHook()
-{
-    esp_vApplicationIdleHook();
-}
+    prvMiscInitialization();
 
-/*-----------------------------------------------------------*/
-
-void vApplicationDaemonTaskStartupHook( void )
-{
-}
-
-#if !AFR_ESP_LWIP
-/*-----------------------------------------------------------*/
-void vApplicationIPNetworkEventHook( eIPCallbackEvent_t eNetworkEvent )
-{
-    uint32_t ulIPAddress, ulNetMask, ulGatewayAddress, ulDNSServerAddress;
-    system_event_t evt;
-
-    if( eNetworkEvent == eNetworkUp )
+    if( SYSTEM_Init() == pdPASS )
     {
-        /* Print out the network configuration, which may have come from a DHCP
-         * server. */
-        FreeRTOS_GetAddressConfiguration(
-            &ulIPAddress,
-            &ulNetMask,
-            &ulGatewayAddress,
-            &ulDNSServerAddress );
 
-        evt.event_id = SYSTEM_EVENT_STA_GOT_IP;
-        evt.event_info.got_ip.ip_changed = true;
-        evt.event_info.got_ip.ip_info.ip.addr = ulIPAddress;
-        evt.event_info.got_ip.ip_info.netmask.addr = ulNetMask;
-        evt.event_info.got_ip.ip_info.gw.addr = ulGatewayAddress;
-        esp_event_send( &evt );
+        configPRINTF( ( "Calling Dummy Component: %d\n", dummy() ));
+
+        /* A simple example to demonstrate key and certificate provisioning in
+         * microcontroller flash using PKCS#11 interface. This should be replaced
+         * by production ready key provisioning mechanism. */
+        vDevModeKeyProvisioning();
+
+        #if BLE_ENABLED
+            /* Initialize BLE. */
+            ESP_ERROR_CHECK( esp_bt_controller_mem_release( ESP_BT_MODE_CLASSIC_BT ) );
+
+            if( prvBLEStackInit() != ESP_OK )
+            {
+                configPRINTF( ( "Failed to initialize the bluetooth stack\n " ) );
+
+                while( 1 )
+                {
+                }
+            }
+        #else
+            ESP_ERROR_CHECK( esp_bt_controller_mem_release( ESP_BT_MODE_CLASSIC_BT ) );
+            ESP_ERROR_CHECK( esp_bt_controller_mem_release( ESP_BT_MODE_BLE ) );
+        #endif /* if BLE_ENABLED */
+
+        workshop_run();
     }
+
+    /* Start the scheduler.  Initialization that requires the OS to be running,
+     * including the WiFi initialization, is performed in the RTOS daemon task
+     * startup hook. */
+    /* Following is taken care by initialization code in ESP IDF */
+    /* vTaskStartScheduler(); */
+    return 0;
 }
+
+/*-----------------------------------------------------------*/
+
+static void prvMiscInitialization( void )
+{
+    /* Initialize NVS */
+    esp_err_t ret = nvs_flash_init();
+
+    if( ( ret == ESP_ERR_NVS_NO_FREE_PAGES ) || ( ret == ESP_ERR_NVS_NEW_VERSION_FOUND ) )
+    {
+        ESP_ERROR_CHECK( nvs_flash_erase() );
+        ret = nvs_flash_init();
+    }
+
+    ESP_ERROR_CHECK( ret );
+
+    #if BLE_ENABLED
+        NumericComparisonInit();
+        spp_uart_init();
+    #endif
+
+    /* Create tasks that are not dependent on the WiFi being initialized. */
+    xLoggingTaskInitialize( mainLOGGING_TASK_STACK_SIZE,
+                            tskIDLE_PRIORITY + 5,
+                            mainLOGGING_MESSAGE_QUEUE_LENGTH );
+
+#if AFR_ESP_LWIP
+    configPRINTF( ("Initializing lwIP TCP stack\r\n") );
+    tcpip_adapter_init();
+#else
+    configPRINTF( ("Initializing FreeRTOS TCP stack\r\n") );
+    vApplicationIPInit();
 #endif
+}
+
+/*-----------------------------------------------------------*/

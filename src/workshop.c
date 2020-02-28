@@ -34,11 +34,14 @@
 
 /* Declaration of demo functions. */
 #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
-#include "lab1_aws_iot_button.h"
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON || LABCONFIG_LAB2_SHADOW
-#ifdef LABCONFIG_LAB2_SHADOW
-#include "lab2_shadow.h"
-#endif // LABCONFIG_LAB2_SHADOW
+    #include "lab1_aws_iot_button.h"
+#elif defined(LABCONFIG_LAB2_SHADOW)
+    #include "lab2_shadow.h"
+#endif
+
+#ifndef BUTTON_A_PRESS_ACTION
+#define BUTTON_A_PRESS_ACTION(x, y) ESP_LOGI(TAG, "Button A Pressed No Action");
+#endif
 
 #include "lab_connection.h"
 
@@ -62,12 +65,7 @@ static void prvAccelerometerTask( void *pvParameters );
 
 esp_err_t workshop_init(void);
 
-#if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
-
-IotSemaphore_t lab1_semaphore;
-
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON || LABCONFIG_LAB2_SHADOW
-
+IotSemaphore_t wakeup_button_semaphore;
 
 /*-----------------------------------------------------------*/
 
@@ -112,19 +110,72 @@ void button_event_handler(void * handler_arg, esp_event_base_t base, int32_t id,
             ESP_LOGI(TAG, "Button A Held");            
         }
         
-#if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
-        IotSemaphore_Wait(&lab1_semaphore);
-        lab1_action(strMACAddr, id);
-        IotSemaphore_Post(&lab1_semaphore);
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON || LABCONFIG_LAB2_SHADOW
+        // IotSemaphore_Wait(&wakeup_button_semaphore); // To deal with race condition on wakeup and button handler
+        BUTTON_A_PRESS_ACTION(strMACAddr, id);
+        // IotSemaphore_Post(&wakeup_button_semaphore); // To deal with race condition on wakeup and button handler
 
     }
 
-    if (base == M5STICKC_BUTTON_B_EVENT_BASE && id == M5STICKC_BUTTON_HOLD_EVENT) {
-        ESP_LOGI(TAG, "Button B Held");
-        ESP_LOGI(TAG, "Restarting");
-        esp_restart();
+    if (base == M5STICKC_BUTTON_B_EVENT_BASE) {
+
+        if (id == M5STICKC_BUTTON_HOLD_EVENT) {
+            ESP_LOGI(TAG, "Button B Held");
+            ESP_LOGI(TAG, "Reseting Wifi Networks");
+            resetStoredWifiNetworks();
+        }
+        if (id == M5STICKC_BUTTON_CLICK_EVENT) {
+            ESP_LOGI(TAG, "Button B Pressed");
+            ESP_LOGI(TAG, "Restarting in 2secs");
+            vTaskDelay( pdMS_TO_TICKS( 2000 ) );
+            esp_restart();
+        }
     }
+}
+
+esp_err_t display_init(void)
+{
+    esp_err_t res = ESP_FAIL;
+
+    TFT_FONT_ROTATE = 0;
+    TFT_TEXT_WRAP = 0;
+    TFT_FONT_TRANSPARENT = 0;
+    TFT_FONT_FORCEFIXED = 0;
+    TFT_GRAY_SCALE = 0;
+    TFT_setGammaCurve(DEFAULT_GAMMA_CURVE);
+    TFT_setRotation(LANDSCAPE_FLIP);
+    TFT_setFont(DEFAULT_FONT, NULL);
+    TFT_resetclipwin();
+    TFT_fillScreen(TFT_BLACK);
+    TFT_FONT_BACKGROUND = TFT_BLACK;
+    TFT_FONT_FOREGROUND = TFT_ORANGE;
+    res = M5StickCDisplayOn();
+
+    if (res == ESP_OK)
+    {
+        #define SCREEN_OFFSET 2
+        #define SCREEN_LINE_HEIGHT 14
+        #define SCREEN_LINE_1  SCREEN_OFFSET + 0 * SCREEN_LINE_HEIGHT
+        #define SCREEN_LINE_2  SCREEN_OFFSET + 1 * SCREEN_LINE_HEIGHT
+        #define SCREEN_LINE_3  SCREEN_OFFSET + 2 * SCREEN_LINE_HEIGHT
+        #define SCREEN_LINE_4  SCREEN_OFFSET + 3 * SCREEN_LINE_HEIGHT
+
+        TFT_print((char *)"Amazon FreeRTOS", CENTER, SCREEN_LINE_1);
+        TFT_print((char *)"workshop", CENTER, SCREEN_LINE_2);
+
+        #if defined(LABCONFIG_LAB0_SETUP)
+            TFT_print((char *)"LAB0 - SETUP", CENTER, SCREEN_LINE_4);
+        #elif defined(LABCONFIG_LAB1_AWS_IOT_BUTTON)
+            TFT_print((char *)"LAB1 - AWS IOT BUTTON", CENTER, SCREEN_LINE_4);
+        #elif defined(LABCONFIG_LAB2_SHADOW)
+            TFT_print((char *)"LAB2 - THING SHADOW", CENTER, SCREEN_LINE_4);
+        #endif
+
+        TFT_drawLine(0, M5STICKC_DISPLAY_HEIGHT - 13 - 3, M5STICKC_DISPLAY_WIDTH, M5STICKC_DISPLAY_HEIGHT - 13 - 3, TFT_ORANGE);
+
+        res = draw_battery_level();
+    }
+
+    return res;
 }
 
 esp_err_t workshop_init(void)
@@ -150,50 +201,10 @@ esp_err_t workshop_init(void)
 				0,				                /* The priority assigned to the task. */
 				&xAccelerometerTaskHandle );	/* The task handle is used to obtain the name of the task. */
 
-    TFT_FONT_ROTATE = 0;
-    TFT_TEXT_WRAP = 0;
-    TFT_FONT_TRANSPARENT = 0;
-    TFT_FONT_FORCEFIXED = 0;
-    TFT_GRAY_SCALE = 0;
-    TFT_setGammaCurve(DEFAULT_GAMMA_CURVE);
-    TFT_setRotation(LANDSCAPE_FLIP);
-    TFT_setFont(DEFAULT_FONT, NULL);
-    TFT_resetclipwin();
-    TFT_fillScreen(TFT_BLACK);
-    TFT_FONT_BACKGROUND = TFT_BLACK;
-    TFT_FONT_FOREGROUND = TFT_ORANGE;
-    res = M5StickCDisplayOn();
+    res = display_init();
     ESP_LOGI(TAG, "              LCD Backlight ON ...    %s", res == ESP_OK ? "OK" : "NOK");
     if (res != ESP_OK) return res;
-
-    #define SCREEN_OFFSET 2
-    #define SCREEN_LINE_HEIGHT 14
-    #define SCREEN_LINE_1  SCREEN_OFFSET + 0 * SCREEN_LINE_HEIGHT
-    #define SCREEN_LINE_2  SCREEN_OFFSET + 1 * SCREEN_LINE_HEIGHT
-    #define SCREEN_LINE_3  SCREEN_OFFSET + 2 * SCREEN_LINE_HEIGHT
-    #define SCREEN_LINE_4  SCREEN_OFFSET + 3 * SCREEN_LINE_HEIGHT
-
-    TFT_print((char *)"Amazon FreeRTOS", CENTER, SCREEN_LINE_1);
-    TFT_print((char *)"workshop", CENTER, SCREEN_LINE_2);
-
-#ifdef LABCONFIG_LAB0_SETUP
-    TFT_print((char *)"LAB0 - SETUP", CENTER, SCREEN_LINE_4);
-#endif // LABCONFIG_LAB0_SETUP
-
-#ifdef LABCONFIG_LAB1_AWS_IOT_BUTTON
-    TFT_print((char *)"LAB1 - AWS IOT BUTTON", CENTER, SCREEN_LINE_4);
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON
-
-#ifdef LABCONFIG_LAB2_SHADOW
-    TFT_print((char *)"LAB2 - THING SHADOW", CENTER, SCREEN_LINE_4);
-    lab2_init(strMACAddr);
-#endif // LABCONFIG_LAB2_SHADOW
-
-    TFT_drawLine(0, M5STICKC_DISPLAY_HEIGHT - 13 - 3, M5STICKC_DISPLAY_WIDTH, M5STICKC_DISPLAY_HEIGHT - 13 - 3, TFT_ORANGE);
     
-    res = draw_battery_level();
-    battery_refresh_timer_init();
-
     res = esp_event_handler_register_with(m5stickc_event_event_loop, M5STICKC_BUTTON_A_EVENT_BASE, ESP_EVENT_ANY_ID, button_event_handler, NULL);
     ESP_LOGI(TAG, "              Button A registered ... %s", res == ESP_OK ? "OK" : "NOK");
     if (res != ESP_OK) return res;
@@ -205,48 +216,42 @@ esp_err_t workshop_init(void)
     ESP_LOGI(TAG, "workshop_init: ... done");
     ESP_LOGI(TAG, "======================================================");
 
-#if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
-
-    if (!IotSemaphore_Create(&lab1_semaphore, 0, 1))
+    // Create semaphore for lab1
+    if (!IotSemaphore_Create(&wakeup_button_semaphore, 0, 1))
     {
         ESP_LOGE(TAG, "Failed to create Lab 1 semaphore!");
         res = ESP_FAIL;
     }
-
     if (res == ESP_OK)
     {
         /* Init the Semaphore to release it */
-        IotSemaphore_Post(&lab1_semaphore);
+        IotSemaphore_Post(&wakeup_button_semaphore);
     }
 
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON || LABCONFIG_LAB2_SHADOW
+    /* Init the labs */
+    LAB_INIT( strMACAddr );
 
-#ifdef LABCONFIG_LAB1_AWS_IOT_BUTTON
-
-    lab1_init(strMACAddr);
-
-    // Create semaphore for lab1
+    // This is where we deal with the wakeup cause.
     if ( res == ESP_OK )
     {
-        /* Take the Semaphore */
-        IotSemaphore_Wait( &lab1_semaphore );
+        /* Take the Semaphore to avoid race condition with the button event */
+        IotSemaphore_Wait( &wakeup_button_semaphore );
         
         if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0)
         {
             // Woken up by our button
-            ESP_LOGI( TAG, "                    Woken up by the button" );
-            lab1_action(strMACAddr, M5STICKC_BUTTON_CLICK_EVENT);
+            ESP_LOGI( TAG, "WAKEUP: Woken up by the button" );
+            BUTTON_A_PRESS_ACTION(strMACAddr, M5STICKC_BUTTON_CLICK_EVENT);
         }
         else
         {
             // Woken up by other
-            ESP_LOGI( TAG, "                    Woken up by other!" );
+            ESP_LOGI( TAG, "WAKEUP: Woken up by other reason!" );
         }
 
-        IotSemaphore_Post( &lab1_semaphore );
+        /* Release the Semaphore */
+        IotSemaphore_Post( &wakeup_button_semaphore );
     }
-
-#endif // LABCONFIG_LAB1_AWS_IOT_BUTTON
 
     return res;
 }
@@ -347,7 +352,7 @@ static void prvAccelerometerTask( void *pvParameters )
         }
 
         // ESP_LOGI(TAG, "MPU6886: Accel(%f, %f, %f)  Gyro(%f, %f, %f) Temp(%f) AHRS(%f, %f, %f)", ax, ay, az, gx, gy, gz, t, pitch, roll, yaw);
-        // vTaskDelay( xDelayTimeInTicks );
+        vTaskDelay( xDelayTimeInTicks );
 	}
 
     vTaskDelete( NULL );

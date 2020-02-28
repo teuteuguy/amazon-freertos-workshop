@@ -41,6 +41,7 @@ target_link_libraries(afr_workshop
         AFR::demo_ble_numeric_comparison
         AFR::demo_mqtt
         AFR::shadow
+        AFR::demo_wifi_provisioning
 )
 
 

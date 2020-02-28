@@ -10,9 +10,9 @@
 
 #include "esp_err.h"
 
-/* For simplicity of setting up WIFI and other libraries, 
- * we re-use the Amazon FreeRTOS demos. Here we re-define to run specific Workshop Labs */
-#define DEMO_RUNNER_RunDemos workshop_run
+#ifndef LAB_INIT
+    #define LAB_INIT(x)
+#endif
 
 esp_err_t workshop_run(void);
 
