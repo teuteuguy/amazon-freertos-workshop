@@ -11,9 +11,9 @@
 #include "esp_err.h"
 
 #ifndef LAB_INIT
-    #define LAB_INIT(x)
+    #define LAB_INIT(x) ESP_OK
 #endif
 
-esp_err_t workshop_run(void);
+esp_err_t eWorkshopRun(void);
 
 #endif /* ifndef _WORKSHOP__H_ */

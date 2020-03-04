@@ -33,8 +33,6 @@
 #include "lab_connection.h"
 #include "lab1_aws_iot_button.h"
 
-#include "m5stickc.h"
-
 static const char *TAG = "lab1_aws_iot_button";
 
 
@@ -214,14 +212,14 @@ static int _publishMessage( const char * pTopicName,
     publishInfo.retryMs = PUBLISH_RETRY_MS;
     publishInfo.retryLimit = PUBLISH_RETRY_LIMIT;
 
-    status = lab_connection_publish(&publishInfo, &publishComplete);
+    status = eLabConnectionPublish(&publishInfo, &publishComplete);
 
     return status;
 }
 
 /*-----------------------------------------------------------*/
 
-void lab1_init(const char *const strID)
+esp_err_t eLab1Init(const char *const strID)
 {
     static iot_connection_params_t connectionParams;
 
@@ -230,15 +228,17 @@ void lab1_init(const char *const strID)
     connectionParams.networkConnectedCallback = NULL;
     connectionParams.networkDisconnectedCallback = NULL;
 
-    lab_connection_init(&connectionParams);
+    return eLabConnectionInit(&connectionParams);
 }
 
 
 /*-----------------------------------------------------------*/
 
-void lab1_action( const char * strID, int32_t buttonID ) 
+esp_err_t eLab1Action( const char * strID, int32_t buttonID ) 
 {
-    if (is_lab_connection_mqtt_connected())
+    esp_err_t res = ESP_FAIL;
+
+    if ( bIsLabConnectionMqttConnected() )
     {
         ESP_LOGI(TAG, "lab1_action: %d", buttonID);
         
@@ -249,11 +249,11 @@ void lab1_action( const char * strID, int32_t buttonID )
         /* Generate the payload for the PUBLISH. */
         int status = -1;
         
-        if ( buttonID == M5STICKC_BUTTON_CLICK_EVENT ) 
+        if ( buttonID == BUTTON_CLICK ) 
         {
             status = snprintf( pPublishPayload, PUBLISH_PAYLOAD_BUFFER_LENGTH, PUBLISH_PAYLOAD_FORMAT_SINGLE, strID );
         }
-        if ( buttonID == M5STICKC_BUTTON_HOLD_EVENT ) 
+        if ( buttonID == BUTTON_HOLD ) 
         {
             status = snprintf( pPublishPayload, PUBLISH_PAYLOAD_BUFFER_LENGTH, PUBLISH_PAYLOAD_FORMAT_HOLD, strID );
         }
@@ -262,6 +262,7 @@ void lab1_action( const char * strID, int32_t buttonID )
         if( status < 0 )
         {
             IotLogError( "Failed to generate MQTT PUBLISH payload: %d.", (int) status );
+            return ESP_FAIL;
         }
         else
         {
@@ -273,14 +274,17 @@ void lab1_action( const char * strID, int32_t buttonID )
         if ( status < 0 ) 
         {
             IotLogError( "Failed to generate MQTT payload topic: %d.", (int) status );
+            return ESP_FAIL;
         }
         
-        _publishMessage( pTopic, pPublishPayload );
+        res = _publishMessage( pTopic, pPublishPayload );
     }
     else
     {
-        ESP_LOGI(TAG, "lab1_action: %d. Skipped due to lack of MQTT connection", buttonID);
+        ESP_LOGI(TAG, "lab1_action: %d. Skipped due to lack of available MQTT connection", buttonID);
     }
+
+    return res;
 }
 
 /*-----------------------------------------------------------*/

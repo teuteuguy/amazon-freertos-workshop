@@ -8,14 +8,14 @@
 #ifndef _LAB1_AWS_IOT_BUTTON_H_
 #define _LAB1_AWS_IOT_BUTTON_H_
 
-void lab1_init(const char *strID);
-void lab1_action(const char *strID, int32_t buttonID);
+#include "esp_err.h"
 
 #if defined(LAB_INIT)
     #undef LAB_INIT
-    #define LAB_INIT lab1_init
+    #define LAB_INIT(x) eLab1Init(x)
 #endif
 
-#define BUTTON_A_PRESS_ACTION lab1_action
+esp_err_t eLab1Init(const char *strID);
+esp_err_t eLab1Action( const char * strID, int32_t buttonID );
 
 #endif /* ifndef _LAB1_AWS_IOT_BUTTON_H_ */

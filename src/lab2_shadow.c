@@ -39,8 +39,6 @@
 #include "lab_connection.h"
 #include "lab2_shadow.h"
 
-#include "m5stickc.h"
-
 static const char *TAG = "lab2_shadow";
 
 /**
@@ -145,7 +143,7 @@ void vLab2NetworkConnectedCallback(bool awsIotMqttMode,
 void vLab2NetworkDisconnectedCallback(const IotNetworkInterface_t *pNetworkInterface)
 {
     ESP_LOGI(TAG, "vNetworkDisconnectedCallback");
-    lab_connection_cleanup();
+    vLabConnectionCleanup();
 }
 
 /*-----------------------------------------------------------*/
@@ -300,7 +298,7 @@ static int _reportShadow(const char *const pThingName)
 
     if (status == EXIT_SUCCESS)
     {
-        status = lab_connection_update_shadow(&updateDocument);
+        status = eLabConnectionUpdateShadow(&updateDocument);
     }
 
     return status;
@@ -487,7 +485,7 @@ static void prvAirConTimerCallback(TimerHandle_t pxTimer)
 
     if (status >= 0)
     {
-        TFT_print(pAirConStr, M5STICKC_DISPLAY_WIDTH - 6 * 9, M5STICKC_DISPLAY_HEIGHT - 13);
+        DISPLAY_PRINT(pAirConStr, DISPLAY_WIDTH - 6 * 9, DISPLAY_HEIGHT - 13);
     }
     
     /* Report Shadow. */
@@ -503,7 +501,7 @@ static void prvAirConTimerCallback(TimerHandle_t pxTimer)
 
 /*-----------------------------------------------------------*/
 
-void lab2_init(const char *const strID)
+esp_err_t eLab2Init(const char *const strID)
 {
     static iot_connection_params_t connectionParams;
 
@@ -514,7 +512,7 @@ void lab2_init(const char *const strID)
     connectionParams.shadowDeltaCallback = _shadowDeltaCallback;
     connectionParams.shadowUpdatedCallback = _shadowUpdatedCallback;
 
-    lab_connection_init(&connectionParams);
+    return eLabConnectionInit(&connectionParams);
 }
 
 /*-----------------------------------------------------------*/

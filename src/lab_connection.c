@@ -1,5 +1,5 @@
 /**
- * @file lab_connection.h
+ * @file lab_connection.c
  * @brief Connection code for the library to be used commonly accross the different labs.
  *
  * (C) 2019 - Timothee Cruse <timothee.cruse@gmail.com>
@@ -42,8 +42,6 @@
 
 #include "lab_config.h"
 #include "lab_connection.h"
-
-#include "m5stickc.h"
 
 /*-----------------------------------------------------------*/
 
@@ -130,16 +128,16 @@ void vNetworkConnectedCallback( bool awsIotMqttMode,
                                 const IotNetworkInterface_t * pNetworkInterface )
 {
     ESP_LOGI(TAG, "vNetworkConnectedCallback");
-    M5StickCLedSet(M5STICKC_LED_ON);
+    STATUS_LED_ON();    
 }
 
 void vNetworkDisconnectedCallback( const IotNetworkInterface_t * pNetworkInterface )
 {
     ESP_LOGI(TAG, "vNetworkDisconnectedCallback");
-    M5StickCLedSet(M5STICKC_LED_OFF);
+    STATUS_LED_OFF();
 }
 
-void vMQTTDisconnectedCallback( const IotMqttCallbackParam_t * pIotMqttCallbackParam )
+void vMQTTDisconnectedCallback( void * pCallbackContext, IotMqttCallbackParam_t * pIotMqttCallbackParam )
 {
     ESP_LOGI(TAG, "vMQTTDisconnectedCallback");
 }
@@ -434,7 +432,7 @@ uint32_t _getSavedWifiNetworks( void )
 
 /*-----------------------------------------------------------*/
 
-void resetStoredWifiNetworks( void )
+void vLabConnectionResetWifiNetworks( void )
 {
     uint32_t idx;
     WIFIReturnCode_t WifiRet;
@@ -444,19 +442,22 @@ void resetStoredWifiNetworks( void )
 
     for( idx = 0; idx < IOT_BLE_WIFI_PROVISIONING_MAX_SAVED_NETWORKS; idx++ )
     {
-        WifiRet = WIFI_NetworkGet( &profile, idx );
+        // WifiRet = WIFI_NetworkGet( &profile, idx );
+
+        // if( WifiRet != eWiFiSuccess )
+        // {
+        //     break;
+        // }
+
+        WifiRet = WIFI_NetworkDelete( idx );
 
         if( WifiRet != eWiFiSuccess )
         {
             break;
         }
 
-        WifiRet = WIFI_NetworkDelete( idx );
-
         ESP_LOGI(TAG, "Deleting WIFI - %d: %s", idx, profile.cSSID);
     }
-
-    return idx;
 }
 
 /*-----------------------------------------------------------*/
@@ -516,7 +517,7 @@ int lab_run(bool awsIotMqttMode,
 
         if (status != EXIT_FAILURE)
         {
-            uint32_t nbSavedWifiNetworks = _getSavedWifiNetworks();
+            _getSavedWifiNetworks();
 
             ESP_LOGI(TAG, "Lab - Start");
 
@@ -615,7 +616,7 @@ void vLabConnectionTask( void * pArgument )
 
 /*-----------------------------------------------------------*/
 
-esp_err_t lab_connection_init(iot_connection_params_t * pConnectionParams)
+esp_err_t eLabConnectionInit(iot_connection_params_t * pConnectionParams)
 {
     esp_err_t res = EXIT_SUCCESS;
 
@@ -623,7 +624,7 @@ esp_err_t lab_connection_init(iot_connection_params_t * pConnectionParams)
 
     static demoContext_t mqttDemoContext =
     {
-        .networkTypes = AWSIOT_NETWORK_TYPE_WIFI, //configENABLED_NETWORKS,
+        .networkTypes = AWSIOT_NETWORK_TYPE_WIFI,
         .demoFunction = lab_run,
         .networkConnectedCallback = vNetworkConnectedCallback,
         .networkDisconnectedCallback = vNetworkDisconnectedCallback
@@ -663,7 +664,15 @@ esp_err_t lab_connection_init(iot_connection_params_t * pConnectionParams)
     if ( res == EXIT_SUCCESS )
     {
         ESP_LOGI(TAG, "Creating IoT Thread");
-        res = Iot_CreateDetachedThread(vLabConnectionTask, &mqttDemoContext, tskIDLE_PRIORITY + 5, configMINIMAL_STACK_SIZE * 8);        
+        if ( Iot_CreateDetachedThread(vLabConnectionTask, &mqttDemoContext, tskIDLE_PRIORITY + 5, configMINIMAL_STACK_SIZE * 8) )
+        {
+            res = EXIT_SUCCESS;
+        }
+        else 
+        {
+            ESP_LOGE(TAG, "Failed to create IoT thread!");
+            res = EXIT_FAILURE;
+        }
     }
 
     return res;
@@ -671,7 +680,7 @@ esp_err_t lab_connection_init(iot_connection_params_t * pConnectionParams)
 
 /*-----------------------------------------------------------*/
 
-esp_err_t lab_connection_update_shadow(AwsIotShadowDocumentInfo_t *updateDocument)
+esp_err_t eLabConnectionUpdateShadow(AwsIotShadowDocumentInfo_t *updateDocument)
 {
     int status = EXIT_SUCCESS;
     AwsIotShadowError_t updateStatus = AWS_IOT_SHADOW_STATUS_PENDING;
@@ -701,7 +710,7 @@ esp_err_t lab_connection_update_shadow(AwsIotShadowDocumentInfo_t *updateDocumen
 
 /*-----------------------------------------------------------*/
 
-esp_err_t lab_connection_publish(IotMqttPublishInfo_t * publishInfo, IotMqttCallbackInfo_t * publishComplete)
+esp_err_t eLabConnectionPublish(IotMqttPublishInfo_t * publishInfo, IotMqttCallbackInfo_t * publishComplete)
 {
     int status = EXIT_SUCCESS;
     IotMqttError_t publishStatus = IOT_MQTT_STATUS_PENDING;
@@ -730,13 +739,13 @@ esp_err_t lab_connection_publish(IotMqttPublishInfo_t * publishInfo, IotMqttCall
 }
 /*-----------------------------------------------------------*/
 
-void lab_connection_cleanup(void)
+void vLabConnectionCleanup(void)
 {
     IotSemaphore_Post(&cleanUpReadySem);
 }
 
 
-bool is_lab_connection_mqtt_connected(void)
+bool bIsLabConnectionMqttConnected(void)
 {
     return mqttConnectionEstablished;
 }

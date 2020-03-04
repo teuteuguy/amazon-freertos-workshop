@@ -26,21 +26,17 @@
 #include "semphr.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-
-#include "m5stickc.h"
+#include "esp_event.h"
 
 #include "lab_config.h"
 #include "workshop.h"
+#include "device.h"
 
 /* Declaration of demo functions. */
 #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
     #include "lab1_aws_iot_button.h"
 #elif defined(LABCONFIG_LAB2_SHADOW)
     #include "lab2_shadow.h"
-#endif
-
-#ifndef BUTTON_A_PRESS_ACTION
-#define BUTTON_A_PRESS_ACTION(x, y) ESP_LOGI(TAG, "Button A Pressed No Action");
 #endif
 
 #include "lab_connection.h"
@@ -57,19 +53,11 @@ char strMACAddr[MAC_ADDRESS_STR_LENGTH] = "";
 
 /*-----------------------------------------------------------*/
 
-esp_err_t draw_battery_level(void);
-void battery_refresh_timer_init(void);
-
-static TaskHandle_t xAccelerometerTaskHandle;
-static void prvAccelerometerTask( void *pvParameters );
-
-esp_err_t workshop_init(void);
-
-IotSemaphore_t wakeup_button_semaphore;
+esp_err_t eWorkshopInit(void);
 
 /*-----------------------------------------------------------*/
 
-esp_err_t workshop_run(void)
+esp_err_t eWorkshopRun(void)
 {
     esp_err_t res = esp_efuse_mac_get_default(uMACAddr);
 
@@ -88,7 +76,7 @@ esp_err_t workshop_run(void)
 
     if (res == ESP_OK)
     {
-        res = workshop_init();
+        res = eWorkshopInit();
     }
 
     return res;
@@ -96,265 +84,100 @@ esp_err_t workshop_run(void)
 
 /*-----------------------------------------------------------*/
 
-void button_event_handler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
-{
-    if (base == M5STICKC_BUTTON_A_EVENT_BASE )
+#if defined(DEVICE_HAS_MAIN_BUTTON)
+    void prvWorkshopMainButtonEventHandler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
     {
-
-        if ( id == M5STICKC_BUTTON_CLICK_EVENT )
+        if (base == BUTTON_MAIN_EVENT_BASE )
         {
-            ESP_LOGI(TAG, "Button A Pressed");            
+            if ( id == BUTTON_CLICK )
+            {
+                ESP_LOGI(TAG, "Main Button Pressed");
+            }
+            if ( id == BUTTON_HOLD )
+            {
+                ESP_LOGI(TAG, "Main Button Held");
+            }
         }
-        if ( id == M5STICKC_BUTTON_HOLD_EVENT )
+
+        #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON)|| defined(LABCONFIG_LAB2_SHADOW)
+        if ( eLab1Action( strMACAddr, id ) != ESP_OK ) 
         {
-            ESP_LOGI(TAG, "Button A Held");            
+            ESP_LOGE(TAG, "Failed to run Lab1 Action");
         }
-        
-        // IotSemaphore_Wait(&wakeup_button_semaphore); // To deal with race condition on wakeup and button handler
-        BUTTON_A_PRESS_ACTION(strMACAddr, id);
-        // IotSemaphore_Post(&wakeup_button_semaphore); // To deal with race condition on wakeup and button handler
-
-    }
-
-    if (base == M5STICKC_BUTTON_B_EVENT_BASE) {
-
-        if (id == M5STICKC_BUTTON_HOLD_EVENT) {
-            ESP_LOGI(TAG, "Button B Held");
-            ESP_LOGI(TAG, "Reseting Wifi Networks");
-            resetStoredWifiNetworks();
-        }
-        if (id == M5STICKC_BUTTON_CLICK_EVENT) {
-            ESP_LOGI(TAG, "Button B Pressed");
-            ESP_LOGI(TAG, "Restarting in 2secs");
-            vTaskDelay( pdMS_TO_TICKS( 2000 ) );
-            esp_restart();
-        }
-    }
-}
-
-esp_err_t display_init(void)
-{
-    esp_err_t res = ESP_FAIL;
-
-    TFT_FONT_ROTATE = 0;
-    TFT_TEXT_WRAP = 0;
-    TFT_FONT_TRANSPARENT = 0;
-    TFT_FONT_FORCEFIXED = 0;
-    TFT_GRAY_SCALE = 0;
-    TFT_setGammaCurve(DEFAULT_GAMMA_CURVE);
-    TFT_setRotation(LANDSCAPE_FLIP);
-    TFT_setFont(DEFAULT_FONT, NULL);
-    TFT_resetclipwin();
-    TFT_fillScreen(TFT_BLACK);
-    TFT_FONT_BACKGROUND = TFT_BLACK;
-    TFT_FONT_FOREGROUND = TFT_ORANGE;
-    res = M5StickCDisplayOn();
-
-    if (res == ESP_OK)
-    {
-        #define SCREEN_OFFSET 2
-        #define SCREEN_LINE_HEIGHT 14
-        #define SCREEN_LINE_1  SCREEN_OFFSET + 0 * SCREEN_LINE_HEIGHT
-        #define SCREEN_LINE_2  SCREEN_OFFSET + 1 * SCREEN_LINE_HEIGHT
-        #define SCREEN_LINE_3  SCREEN_OFFSET + 2 * SCREEN_LINE_HEIGHT
-        #define SCREEN_LINE_4  SCREEN_OFFSET + 3 * SCREEN_LINE_HEIGHT
-
-        TFT_print((char *)"Amazon FreeRTOS", CENTER, SCREEN_LINE_1);
-        TFT_print((char *)"workshop", CENTER, SCREEN_LINE_2);
-
-        #if defined(LABCONFIG_LAB0_SETUP)
-            TFT_print((char *)"LAB0 - SETUP", CENTER, SCREEN_LINE_4);
-        #elif defined(LABCONFIG_LAB1_AWS_IOT_BUTTON)
-            TFT_print((char *)"LAB1 - AWS IOT BUTTON", CENTER, SCREEN_LINE_4);
-        #elif defined(LABCONFIG_LAB2_SHADOW)
-            TFT_print((char *)"LAB2 - THING SHADOW", CENTER, SCREEN_LINE_4);
         #endif
-
-        TFT_drawLine(0, M5STICKC_DISPLAY_HEIGHT - 13 - 3, M5STICKC_DISPLAY_WIDTH, M5STICKC_DISPLAY_HEIGHT - 13 - 3, TFT_ORANGE);
-
-        res = draw_battery_level();
     }
-
-    return res;
-}
-
-esp_err_t workshop_init(void)
-{
-    esp_err_t res = ESP_FAIL;
-
-    ESP_LOGI(TAG, "======================================================");
-    ESP_LOGI(TAG, "workshop_init: ...");
-
-    m5stickc_config_t m5stickc_config;
-    m5stickc_config.power.enable_lcd_backlight = false;
-    m5stickc_config.power.lcd_backlight_level = 1;
-
-    res = M5StickCInit(&m5stickc_config);
-    ESP_LOGI(TAG, "workshop_init: M5StickCInit ...       %s", res == ESP_OK ? "OK" : "NOK");
-    if (res != ESP_OK) return res;
-
-    /* Create Accelerometer reading task. */
-	xTaskCreate( prvAccelerometerTask,			/* The function that implements the task. */
-				"AccelTask",    				/* The text name assigned to the task - for debug only as it is not used by the kernel. */
-				2048,		/* The size of the stack to allocate to the task. */
-				NULL,                           /* The parameter passed to the task - in this case the counter to increment. */
-				0,				                /* The priority assigned to the task. */
-				&xAccelerometerTaskHandle );	/* The task handle is used to obtain the name of the task. */
-
-    res = display_init();
-    ESP_LOGI(TAG, "              LCD Backlight ON ...    %s", res == ESP_OK ? "OK" : "NOK");
-    if (res != ESP_OK) return res;
-    
-    res = esp_event_handler_register_with(m5stickc_event_event_loop, M5STICKC_BUTTON_A_EVENT_BASE, ESP_EVENT_ANY_ID, button_event_handler, NULL);
-    ESP_LOGI(TAG, "              Button A registered ... %s", res == ESP_OK ? "OK" : "NOK");
-    if (res != ESP_OK) return res;
-
-    res = esp_event_handler_register_with(m5stickc_event_event_loop, M5STICKC_BUTTON_B_EVENT_BASE, ESP_EVENT_ANY_ID, button_event_handler, NULL);
-    ESP_LOGI(TAG, "              Button B registered ... %s", res == ESP_OK ? "OK" : "NOK");
-    if (res != ESP_OK) return res;
-
-    ESP_LOGI(TAG, "workshop_init: ... done");
-    ESP_LOGI(TAG, "======================================================");
-
-    // Create semaphore for lab1
-    if (!IotSemaphore_Create(&wakeup_button_semaphore, 0, 1))
-    {
-        ESP_LOGE(TAG, "Failed to create Lab 1 semaphore!");
-        res = ESP_FAIL;
-    }
-    if (res == ESP_OK)
-    {
-        /* Init the Semaphore to release it */
-        IotSemaphore_Post(&wakeup_button_semaphore);
-    }
-
-    /* Init the labs */
-    LAB_INIT( strMACAddr );
-
-    // This is where we deal with the wakeup cause.
-    if ( res == ESP_OK )
-    {
-        /* Take the Semaphore to avoid race condition with the button event */
-        IotSemaphore_Wait( &wakeup_button_semaphore );
-        
-        if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0)
-        {
-            // Woken up by our button
-            ESP_LOGI( TAG, "WAKEUP: Woken up by the button" );
-            BUTTON_A_PRESS_ACTION(strMACAddr, M5STICKC_BUTTON_CLICK_EVENT);
-        }
-        else
-        {
-            // Woken up by other
-            ESP_LOGI( TAG, "WAKEUP: Woken up by other reason!" );
-        }
-
-        /* Release the Semaphore */
-        IotSemaphore_Post( &wakeup_button_semaphore );
-    }
-
-    return res;
-}
+#endif // defined(DEVICE_HAS_MAIN_BUTTON)
 
 /*-----------------------------------------------------------*/
 
-static const TickType_t xBatteryRefreshTimerFrequency_ms = 10000UL;
-static TimerHandle_t xBatteryRefresh;
-
-esp_err_t draw_battery_level(void)
-{
-    esp_err_t res = ESP_FAIL;
-    int status = EXIT_SUCCESS;
-    uint16_t vbat = 0, vaps = 0, b, c, battery;
-    char pVbatStr[11] = {0};
-
-    res = M5StickCPowerGetVbat(&vbat);
-    res |= M5StickCPowerGetVaps(&vaps);
-
-    if (res == ESP_OK)
+#if defined(DEVICE_HAS_RESET_BUTTON)
+    void prvWorkshopResetButtonEventHandler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
     {
-        ESP_LOGD(TAG, "draw_battery_level: VBat:         %u", vbat);
-        ESP_LOGD(TAG, "draw_battery_level: VAps:         %u", vaps);
-        b = (vbat * 1.1);
-        ESP_LOGD(TAG, "draw_battery_level: b:            %u", b);
-        c = (vaps * 1.4);
-        ESP_LOGD(TAG, "draw_battery_level: c:            %u", c);
-        battery = ((b - 3000)) / 12;
-        ESP_LOGD(TAG, "draw_battery_level: battery:      %u", battery);
+        if (base == BUTTON_RESET_EVENT_BASE) {
 
-        if (battery >= 100)
-        {
-            battery = 99; // No need to support 100% :)
-        }
-
-        if (c >= 4500) //4.5)
-        {
-            status = snprintf(pVbatStr, 11, "CHG: %02u%%", battery);
-        }
-        else
-        {
-            status = snprintf(pVbatStr, 11, "BAT: %02u%%", battery);
-        }
-
-        if (status < 0) {
-            ESP_LOGE(TAG, "draw_battery_level: error with creating battery string");
-        }
-        else
-        {
-            ESP_LOGD(TAG, "draw_battery_level: Charging str(%i): %s", status, pVbatStr);
-            TFT_print(pVbatStr, 1, M5STICKC_DISPLAY_HEIGHT - 13);
+            if (id == BUTTON_HOLD) {
+                ESP_LOGI(TAG, "Reset Button Held");
+                ESP_LOGI(TAG, "Reseting Wifi Networks");
+                vLabConnectionResetWifiNetworks();
+            }
+            if (id == BUTTON_CLICK) {
+                ESP_LOGI(TAG, "Reset Button Clicked");
+                ESP_LOGI(TAG, "Restarting in 2secs");
+                vTaskDelay( pdMS_TO_TICKS( 2000 ) );
+                esp_restart();
+            }
         }
     }
+#endif // defined(DEVICE_HAS_RESET_BUTTON)
+
+/*-----------------------------------------------------------*/
+
+esp_err_t eWorkshopInit(void)
+{
+    esp_err_t res = ESP_FAIL;
+
+    ESP_LOGI(TAG, "eWorkshopInit: ... ===================================");
+
+    res = eDeviceInit();
+
+    if (res ==  ESP_OK)
+    {
+
+        #if defined(DEVICE_HAS_MAIN_BUTTON)
+            res = eDeviceRegisterButtonCallback(BUTTON_MAIN_EVENT_BASE, prvWorkshopMainButtonEventHandler);
+            if (res !=  ESP_OK)
+            {
+                ESP_LOGE(TAG, "eWorkshopInit: Register main button ... failed");
+            }
+        #endif // defined(DEVICE_HAS_MAIN_BUTTON)
+
+        #if defined(DEVICE_HAS_RESET_BUTTON)
+            res = eDeviceRegisterButtonCallback(BUTTON_RESET_EVENT_BASE, prvWorkshopResetButtonEventHandler);
+            if (res !=  ESP_OK)
+            {
+                ESP_LOGE(TAG, "eWorkshopInit: Register reset button ... failed");
+            }
+        #endif // defined(DEVICE_HAS_RESET_BUTTON)
+
+        /* Init the labs */
+        res = LAB_INIT( strMACAddr );
+
+        if (res == ESP_OK) {
+            ESP_LOGI(TAG, "eWorkshopInit: ... done");
+        }
+        else
+        {
+            ESP_LOGE(TAG, "eWorkshopInit: Init labs ... failed");
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "eWorkshopInit: eDeviceInit ... failed");
+    }
+
+    ESP_LOGI(TAG, "======================================================");
 
     return res;
 }
 
-static void prvBatteryRefreshTimerCallback(TimerHandle_t pxTimer)
-{
-    draw_battery_level();    
-}
-
-void battery_refresh_timer_init(void)
-{
-    xBatteryRefresh = xTimerCreate("BatteryRefresh", pdMS_TO_TICKS(xBatteryRefreshTimerFrequency_ms), pdTRUE, NULL, prvBatteryRefreshTimerCallback);
-    xTimerStart(xBatteryRefresh, 0);
-}
-
-/*-----------------------------------------------------------*/
-
-static void prvAccelerometerTask( void *pvParameters )
-{
-    TickType_t xDelayTimeInTicks = pdMS_TO_TICKS( 1000 );
-
-	for( ;; )
-	{
-        float ax, ay, az, gx, gy, gz, t, pitch, roll, yaw;
-        esp_err_t e;
-        e = M5StickCMPU6886GetAccelData( &ax, &ay, &az );
-        if (e != ESP_OK)
-        {
-            return;
-        }
-        e = M5StickCMPU6886GetGyroData( &gx, &gy, &gz );
-        if (e != ESP_OK)
-        {
-            return;
-        }
-        e = M5StickCMPU6886GetTempData( &t );
-        if (e != ESP_OK)
-        {
-            return;
-        }
-        e = M5StickCMPU6886GetAhrsData( &pitch, &roll, &yaw );
-        if (e != ESP_OK)
-        {
-            return;
-        }
-
-        // ESP_LOGI(TAG, "MPU6886: Accel(%f, %f, %f)  Gyro(%f, %f, %f) Temp(%f) AHRS(%f, %f, %f)", ax, ay, az, gx, gy, gz, t, pitch, roll, yaw);
-        vTaskDelay( xDelayTimeInTicks );
-	}
-
-    vTaskDelete( NULL );
-}
 /*-----------------------------------------------------------*/

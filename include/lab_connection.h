@@ -27,14 +27,14 @@ typedef int (* labRunFunction_t)( bool awsIotMqttMode,
                                 void * pNetworkCredentialInfo,
                                 const IotNetworkInterface_t * pNetworkInterface );
 
-esp_err_t lab_connection_init(iot_connection_params_t * params);
-void lab_connection_cleanup(void);
+esp_err_t eLabConnectionInit(iot_connection_params_t * params);
+void vLabConnectionCleanup(void);
 
-esp_err_t lab_connection_update_shadow(AwsIotShadowDocumentInfo_t *updateDocument);
-esp_err_t lab_connection_publish(IotMqttPublishInfo_t *publishInfo, IotMqttCallbackInfo_t *publishComplete);
+esp_err_t eLabConnectionUpdateShadow(AwsIotShadowDocumentInfo_t *updateDocument);
+esp_err_t eLabConnectionPublish(IotMqttPublishInfo_t *publishInfo, IotMqttCallbackInfo_t *publishComplete);
 
-void resetStoredWifiNetworks( void );
+void vLabConnectionResetWifiNetworks( void );
 
-bool is_lab_connection_mqtt_connected(void);
+bool bIsLabConnectionMqttConnected(void);
 
 #endif /* ifndef _LAB_CONNECTION_H_ */
