@@ -35,7 +35,8 @@
 /* Declaration of demo functions. */
 #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)
     #include "lab1_aws_iot_button.h"
-#elif defined(LABCONFIG_LAB2_SHADOW)
+#endif
+#if defined(LABCONFIG_LAB2_SHADOW)
     #include "lab2_shadow.h"
 #endif
 
@@ -145,7 +146,7 @@ esp_err_t eWorkshopInit(void)
 
         #if defined(DEVICE_HAS_MAIN_BUTTON)
             res = eDeviceRegisterButtonCallback(BUTTON_MAIN_EVENT_BASE, prvWorkshopMainButtonEventHandler);
-            if (res !=  ESP_OK)
+            if (res != ESP_OK)
             {
                 ESP_LOGE(TAG, "eWorkshopInit: Register main button ... failed");
             }

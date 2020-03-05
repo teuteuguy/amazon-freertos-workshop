@@ -15,7 +15,7 @@
  * 
  * These defines will be used throughout the workshop code. */
 
-#define DEVICE_ESP32_DEVKITC
+#define DEVICE_M5STICKC
 
 /* To run a particular lab you need to define one of these.
  * Only one lab can be configured at a time
@@ -26,7 +26,7 @@
  *
  * These defines will be used throughout the workshop code. */
 
-#define LABCONFIG_LAB1_AWS_IOT_BUTTON
+#define LABCONFIG_LAB0_DO_NOTHING
 
 #include "device.h"
 

@@ -221,6 +221,8 @@ static int _publishMessage( const char * pTopicName,
 
 esp_err_t eLab1Init(const char *const strID)
 {
+    ESP_LOGI(TAG, "eLab1Init: Init");
+
     static iot_connection_params_t connectionParams;
 
     connectionParams.strID = (char *)strID;

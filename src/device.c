@@ -114,7 +114,7 @@ esp_err_t eDeviceInit(void)
         /* Create Accelerometer reading task. */
         xTaskCreate( prvAccelerometerTask,			/* The function that implements the task. */
                     "AccelTask",    				/* The text name assigned to the task - for debug only as it is not used by the kernel. */
-                    2048,		/* The size of the stack to allocate to the task. */
+                    2048,		                    /* The size of the stack to allocate to the task. */
                     NULL,                           /* The parameter passed to the task - in this case the counter to increment. */
                     0,				                /* The priority assigned to the task. */
                     &xAccelerometerTaskHandle );	/* The task handle is used to obtain the name of the task. */
@@ -144,14 +144,23 @@ esp_err_t eDeviceInit(void)
 #elif defined(DEVICE_M5STICKC)
     #define DEVICE_BUTTON_EVENT_LOOP m5stickc_event_loop
 #else
-    esp_event_loop_handle_t dummy_event_event_loop;
-    #define DEVICE_BUTTON_EVENT_LOOP dummy_event_event_loop
+    esp_event_loop_handle_t dummy_event_loop;
+    #define DEVICE_BUTTON_EVENT_LOOP dummy_event_loop
 #endif
 
 esp_err_t eDeviceRegisterButtonCallback(esp_event_base_t base, void (*callback)(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data) )
 {
-    esp_err_t res = esp_event_handler_register_with(DEVICE_BUTTON_EVENT_LOOP, base, ESP_EVENT_ANY_ID, callback, NULL);
-    ESP_LOGD(TAG, "eDeviceRegisterButtonCallback: Button registered... %s", res == ESP_OK ? "OK" : "NOK");
+    esp_err_t res = ESP_FAIL;
+    if (DEVICE_BUTTON_EVENT_LOOP)
+    {
+        res = esp_event_handler_register_with(DEVICE_BUTTON_EVENT_LOOP, base, ESP_EVENT_ANY_ID, callback, NULL);
+        ESP_LOGD(TAG, "eDeviceRegisterButtonCallback: Button registered... %s", res == ESP_OK ? "OK" : "NOK");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "eDeviceRegisterButtonCallback: DEVICE_BUTTON_EVENT_LOOP is NULL");
+    }
+    
     return res;
 }
 
@@ -188,7 +197,7 @@ esp_err_t eDeviceRegisterButtonCallback(esp_event_base_t base, void (*callback)(
                     return;
                 }
 
-                ESP_LOGD(TAG, "MPU6886: Accel(%f, %f, %f)  Gyro(%f, %f, %f) Temp(%f) AHRS(%f, %f, %f)", ax, ay, az, gx, gy, gz, t, pitch, roll, yaw);
+                // ESP_LOGI(TAG, "MPU6886: Accel(%f, %f, %f)  Gyro(%f, %f, %f) Temp(%f) AHRS(%f, %f, %f)", ax, ay, az, gx, gy, gz, t, pitch, roll, yaw);
             #endif
 
             vTaskDelay( xDelayTimeInTicks );

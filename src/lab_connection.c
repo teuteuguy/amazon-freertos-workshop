@@ -110,7 +110,7 @@ static IotSemaphore_t connectionReadySem;
 static IotSemaphore_t cleanUpReadySem;
 
 /* Semaphore for shadow delta management */ 
-static IotSemaphore_t shadowDeltaSem;
+// static IotSemaphore_t shadowDeltaSem;
 
 /* Handle of the MQTT connection used in this demo. */
 static IotMqttConnection_t _mqttConnection = IOT_MQTT_CONNECTION_INITIALIZER;
@@ -118,6 +118,11 @@ static IotMqttConnection_t _mqttConnection = IOT_MQTT_CONNECTION_INITIALIZER;
 static iot_connection_params_t *_pConnectionParams = NULL;
 
 static bool mqttConnectionEstablished = false;
+
+ESP_EVENT_DEFINE_BASE(LAB_CONNECTION_EVENT_BASE);
+esp_event_loop_handle_t lab_connection_event_loop;
+
+char prvThingName[128] = { 0 }; 
 
 /*-----------------------------------------------------------*/
 
@@ -127,19 +132,54 @@ void vNetworkConnectedCallback( bool awsIotMqttMode,
                                 void * pNetworkCredentialInfo,
                                 const IotNetworkInterface_t * pNetworkInterface )
 {
-    ESP_LOGI(TAG, "vNetworkConnectedCallback");
-    STATUS_LED_ON();    
+    esp_event_post_to(lab_connection_event_loop, 
+                    LAB_CONNECTION_EVENT_BASE, 
+                    LABCONNECTION_NETWORK_CONNECTED, 
+                    (void *)pIdentifier, 
+                    pIdentifier == NULL ? 0 : strlen(pIdentifier), 
+                    portMAX_DELAY);    
 }
 
 void vNetworkDisconnectedCallback( const IotNetworkInterface_t * pNetworkInterface )
 {
-    ESP_LOGI(TAG, "vNetworkDisconnectedCallback");
-    STATUS_LED_OFF();
+    esp_event_post_to(lab_connection_event_loop, 
+                    LAB_CONNECTION_EVENT_BASE, 
+                    LABCONNECTION_NETWORK_DISCONNECTED, 
+                    NULL, 0, 
+                    portMAX_DELAY);    
 }
 
 void vMQTTDisconnectedCallback( void * pCallbackContext, IotMqttCallbackParam_t * pIotMqttCallbackParam )
 {
-    ESP_LOGI(TAG, "vMQTTDisconnectedCallback");
+    esp_event_post_to(lab_connection_event_loop, 
+                    LAB_CONNECTION_EVENT_BASE, 
+                    LABCONNECTION_MQTT_DISCONNECTED, 
+                    NULL, 0, 
+                    portMAX_DELAY);    
+}
+
+void prvLabConnectionEventHandler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
+{
+    if (id == LABCONNECTION_NETWORK_CONNECTED)
+    {
+        ESP_LOGI(TAG, "LABCONNECTION_NETWORK_CONNECTED");
+        STATUS_LED_ON();
+    }
+    else if (id == LABCONNECTION_NETWORK_DISCONNECTED)
+    {
+        ESP_LOGI(TAG, "LABCONNECTION_NETWORK_DISCONNECTED");
+        STATUS_LED_OFF();
+    }
+    else if (id == LABCONNECTION_MQTT_CONNECTED)
+    {
+        char * thingName = ((connection_event_params_t *)event_data)->thingName;
+        ESP_LOGI(TAG, "LABCONNECTION_MQTT_CONNECTED: %s (%i)", thingName, strlen(thingName));
+    }
+    else if (id == LABCONNECTION_MQTT_DISCONNECTED)
+    {
+        ESP_LOGI(TAG, "LABCONNECTION_MQTT_DISCONNECTED");
+        vLabConnectionCleanup();
+    }
 }
 
 /*-----------------------------------------------------------*/
@@ -226,7 +266,7 @@ static int _setShadowCallbacks(const char *pThingName)
     AwsIotShadowCallbackInfo_t updatedCallback = AWS_IOT_SHADOW_CALLBACK_INFO_INITIALIZER;
 
     /* Set the functions for callbacks. */
-    deltaCallback.pCallbackContext = &shadowDeltaSem;
+    // deltaCallback.pCallbackContext = &shadowDeltaSem;
     deltaCallback.function = _pConnectionParams->shadowDeltaCallback;
     updatedCallback.function = _pConnectionParams->shadowUpdatedCallback;
 
@@ -246,6 +286,11 @@ static int _setShadowCallbacks(const char *pThingName)
                         AwsIotShadow_strerror(callbackStatus));
             status = EXIT_FAILURE;
         }
+        else
+        {
+            IotLogInfo("Successfully set delta callbacks");
+        }
+        
     }
 
     if (_pConnectionParams->shadowUpdatedCallback != NULL && callbackStatus == AWS_IOT_SHADOW_SUCCESS)
@@ -262,6 +307,10 @@ static int _setShadowCallbacks(const char *pThingName)
             IotLogError("Failed to set shadow callback, error %s.",
                         AwsIotShadow_strerror(callbackStatus));
             status = EXIT_FAILURE;
+        }
+        else
+        {
+            IotLogInfo("Successfully set updated callbacks");
         }
     }
 
@@ -400,6 +449,16 @@ static int _establishMqttConnection(const char *pIdentifier,
             IotLogError("MQTT CONNECT returned error %s.", IotMqtt_strerror(connectStatus));
             status = EXIT_FAILURE;
         }
+        else
+        {
+
+            uint8_t thingNameLength = ((connectInfo.clientIdentifierLength) < (128) ? (connectInfo.clientIdentifierLength) : (128));
+            strncpy(prvThingName, connectInfo.pClientIdentifier, thingNameLength);
+
+            IotLogInfo("MQTT CONNECT Success for %s (%i)", prvThingName, strlen(prvThingName));
+
+            status = IOT_MQTT_SUCCESS;
+        }
     }
 
     return status;
@@ -442,14 +501,7 @@ void vLabConnectionResetWifiNetworks( void )
 
     for( idx = 0; idx < IOT_BLE_WIFI_PROVISIONING_MAX_SAVED_NETWORKS; idx++ )
     {
-        // WifiRet = WIFI_NetworkGet( &profile, idx );
-
-        // if( WifiRet != eWiFiSuccess )
-        // {
-        //     break;
-        // }
-
-        WifiRet = WIFI_NetworkDelete( idx );
+        WifiRet = WIFI_NetworkGet( &profile, idx );
 
         if( WifiRet != eWiFiSuccess )
         {
@@ -457,6 +509,13 @@ void vLabConnectionResetWifiNetworks( void )
         }
 
         ESP_LOGI(TAG, "Deleting WIFI - %d: %s", idx, profile.cSSID);
+
+        WifiRet = WIFI_NetworkDelete( idx );
+
+        if( WifiRet != eWiFiSuccess )
+        {
+            break;
+        }
     }
 }
 
@@ -483,6 +542,7 @@ int lab_run(bool awsIotMqttMode,
             void *pNetworkCredentialInfo,
             const IotNetworkInterface_t *pNetworkInterface)
 {
+    static connection_event_params_t connectionEventParams;
 
     for(;;)
     {        
@@ -498,103 +558,94 @@ int lab_run(bool awsIotMqttMode,
         * to AWS IoT, so this value is hardcoded to true whenever needed. */
         (void)awsIotMqttMode;
 
-        /* Determine the length of the Thing Name. */
-        if (pIdentifier != NULL)
-        {
-            int thingNameLength = strlen(pIdentifier);
+        _getSavedWifiNetworks();
 
-            if (thingNameLength == 0)
-            {
-                ESP_LOGE(TAG, "Lab - The length of the Thing Name (identifier) must be nonzero.");
-                status = EXIT_FAILURE;
-            }
+        ESP_LOGI(TAG, "lab_run: Start");
+
+        /* Initialize the libraries required for this demo. */
+        status = _initializeLibraries();
+
+        if (status == EXIT_SUCCESS)
+        {
+            /* Mark the libraries as initialized. */
+            librariesInitialized = true;
+
+            ESP_LOGI(TAG, "lab_run: Libraries initialized");
+
+            /* Establish a new MQTT connection. */
+            status = _establishMqttConnection(pIdentifier,
+                                            pNetworkServerInfo,
+                                            pNetworkCredentialInfo,
+                                            pNetworkInterface);
         }
         else
         {
-            ESP_LOGE(TAG, "Lab - A Thing Name (identifier) must be provided for the Shadow demo.");
-            status = EXIT_FAILURE;
+            ESP_LOGE(TAG, "lab_run: Failed to initialize the libraries: %i", status);
+            return status;
         }
 
-        if (status != EXIT_FAILURE)
+        if (status == EXIT_SUCCESS)
         {
-            _getSavedWifiNetworks();
+            /* Mark the MQTT connection as established. */
+            mqttConnectionEstablished = true;
 
-            ESP_LOGI(TAG, "Lab - Start");
+            ESP_LOGI(TAG, "lab_run: MQTT Connection established");
 
-            /* Initialize the libraries required for this demo. */
-            status = _initializeLibraries();
-
-            if (status == EXIT_SUCCESS)
-            {
-                /* Mark the libraries as initialized. */
-                librariesInitialized = true;
-
-                ESP_LOGI(TAG, "Lab - Libraries initialized");
-
-                /* Establish a new MQTT connection. */
-                status = _establishMqttConnection(pIdentifier,
-                                                pNetworkServerInfo,
-                                                pNetworkCredentialInfo,
-                                                pNetworkInterface);
-            }
-            else
-            {
-                ESP_LOGE(TAG, "Lab - Failed to initialize the libraries: %i", status);
-                return status;
-            }
-
-            if (status == EXIT_SUCCESS)
-            {
-                /* Mark the MQTT connection as established. */
-                mqttConnectionEstablished = true;
-
-                ESP_LOGI(TAG, "Lab - MQTT Connection established");
-
-                /* Set the Shadow callbacks for this demo. */
-                status = _setShadowCallbacks(pIdentifier);
-            }
-            else
-            {
-                ESP_LOGE(TAG, "Lab - Failed to initialize the MQTT Connection: %i", status);
-            }
-
-            if (status == EXIT_SUCCESS)
-            {
-                // Connection is ready
-                IotSemaphore_Post(&connectionReadySem);
-                // Shadow can be used
-                // TODO: remove this with a check that MQTT connection is live instead.
-                IotSemaphore_Post(&shadowDeltaSem);
-
-                ESP_LOGI(TAG, "Lab - Waiting for connection clean up signal...");
-                // Wait for clean up semaphore
-                IotSemaphore_Wait(&cleanUpReadySem);
-
-                ESP_LOGI(TAG, "Lab - Received connection clean up signal.");
-                
-                // Cleanup connection cleanup semaphore
-                IotSemaphore_Destroy(&cleanUpReadySem);
-                // Cleanup shadow delta semaphore
-                IotSemaphore_Destroy(&shadowDeltaSem);        
-            }
-
-            /* Disconnect the MQTT connection if it was established. */
-            if (mqttConnectionEstablished == true)
-            {
-                IotMqtt_Disconnect(_mqttConnection, 0);
-                mqttConnectionEstablished = false;
-            }
-
-            /* Clean up libraries if they were initialized. */
-            if (librariesInitialized == true)
-            {
-                ESP_LOGI(TAG, "Lab - Cleaning up");
-                _cleanup();
-            }
-
+            /* Set the Shadow callbacks for this demo. */
+            status = _setShadowCallbacks(prvThingName);
+        }
+        else
+        {
+            ESP_LOGE(TAG, "lab_run: Failed to initialize the MQTT Connection: %i", status);
         }
 
-        ESP_LOGI(TAG, "Lab - End, looping in 10secs");
+        if (status == EXIT_SUCCESS)
+        {
+
+            connectionEventParams.thingName = prvThingName;
+
+            if (ESP_OK != esp_event_post_to(lab_connection_event_loop, 
+                                        LAB_CONNECTION_EVENT_BASE, 
+                                        LABCONNECTION_MQTT_CONNECTED, 
+                                        &connectionEventParams,
+                                        sizeof(connection_event_params_t),
+                                        portMAX_DELAY))
+            {
+                ESP_LOGE(TAG, "lab_run: failed to post to event");
+            }
+
+            // Connection is ready
+            IotSemaphore_Post(&connectionReadySem);
+            // Shadow can be used
+            // IotSemaphore_Post(&shadowDeltaSem);
+
+            ESP_LOGI(TAG, "lab_run: Waiting for connection clean up signal...");
+            // Wait for clean up semaphore
+            IotSemaphore_Wait(&cleanUpReadySem);
+
+            ESP_LOGI(TAG, "lab_run: Received connection clean up signal.");
+            
+            // Cleanup connection cleanup semaphore
+            IotSemaphore_Destroy(&cleanUpReadySem);
+            // Cleanup shadow delta semaphore
+            // IotSemaphore_Destroy(&shadowDeltaSem);        
+        }
+
+        /* Disconnect the MQTT connection if it was established. */
+        if (mqttConnectionEstablished == true)
+        {
+            IotMqtt_Disconnect(_mqttConnection, 0);
+            mqttConnectionEstablished = false;
+        }
+
+        /* Clean up libraries if they were initialized. */
+        if (librariesInitialized == true)
+        {
+            ESP_LOGI(TAG, "lab_run: Cleaning up");
+            _cleanup();
+        }
+
+        ESP_LOGI(TAG, "lab_run: End, looping in 10secs");
         vTaskDelay( pdMS_TO_TICKS( 10000 ) );
 
         return status;
@@ -618,7 +669,7 @@ void vLabConnectionTask( void * pArgument )
 
 esp_err_t eLabConnectionInit(iot_connection_params_t * pConnectionParams)
 {
-    esp_err_t res = EXIT_SUCCESS;
+    esp_err_t res = ESP_OK;
 
     _pConnectionParams = pConnectionParams;
 
@@ -640,38 +691,59 @@ esp_err_t eLabConnectionInit(iot_connection_params_t * pConnectionParams)
         mqttDemoContext.networkDisconnectedCallback = _pConnectionParams->networkDisconnectedCallback;
     }
 
+    esp_event_loop_args_t loop_args = {
+        .queue_size = 5,
+        .task_name = "lab_connection_event_loop",
+        .task_priority = 10,
+        .task_stack_size = 2048,
+        .task_core_id = 0
+    };
+
+    res = esp_event_loop_create(&loop_args, &lab_connection_event_loop);
+    if(res == ESP_OK) {
+        ESP_LOGD(TAG, "Event loop created");
+        if( ESP_OK == eLabConnectionRegisterCallback(prvLabConnectionEventHandler) ) {
+            ESP_LOGD(TAG, "Network event handler registered");
+        } else {
+            ESP_LOGE(TAG, "Error registring the event handler: %s", esp_err_to_name(res));
+            res = ESP_FAIL;
+        }
+    } else {
+        ESP_LOGE(TAG, "Error creating event loop: %s", esp_err_to_name(res));
+    }
+
     // Create semaphore for connection readiness
-    if (res == EXIT_SUCCESS && !IotSemaphore_Create(&connectionReadySem, 0, 1))
+    if (res == ESP_OK && !IotSemaphore_Create(&connectionReadySem, 0, 1))
     {
         ESP_LOGE(TAG, "Failed to create connection semaphore!");
-        res = EXIT_FAILURE;
+        res = ESP_FAIL;
     }
     
     // Create semaphore for connection readiness
-    if ( res == EXIT_SUCCESS && !IotSemaphore_Create(&cleanUpReadySem, 0, 1))
+    if ( res == ESP_OK && !IotSemaphore_Create(&cleanUpReadySem, 0, 1))
     {
         ESP_LOGE(TAG, "Failed to create clean up semaphore!");
-        res = EXIT_FAILURE;
+        res = ESP_FAIL;
     }
 
     // Create semaphore for shadow delta
-    if ( res == EXIT_SUCCESS && !IotSemaphore_Create(&shadowDeltaSem, 0, 1))
-    {
-        ESP_LOGE(TAG, "Failed to create shadow delta semaphore!");
-        res = EXIT_FAILURE;
-    }
+    // if ( res == ESP_OK && !IotSemaphore_Create(&shadowDeltaSem, 0, 1))
+    // {
+    //     ESP_LOGE(TAG, "Failed to create shadow delta semaphore!");
+    //     res = ESP_FAIL;
+    // }
 
-    if ( res == EXIT_SUCCESS )
+    if ( res == ESP_OK )
     {
         ESP_LOGI(TAG, "Creating IoT Thread");
         if ( Iot_CreateDetachedThread(vLabConnectionTask, &mqttDemoContext, tskIDLE_PRIORITY + 5, configMINIMAL_STACK_SIZE * 8) )
         {
-            res = EXIT_SUCCESS;
+            res = ESP_OK;
         }
         else 
         {
             ESP_LOGE(TAG, "Failed to create IoT thread!");
-            res = EXIT_FAILURE;
+            res = ESP_FAIL;
         }
     }
 
@@ -680,30 +752,33 @@ esp_err_t eLabConnectionInit(iot_connection_params_t * pConnectionParams)
 
 /*-----------------------------------------------------------*/
 
+// Shadow update completion callback.
+void _updateComplete( void * pCallbackContext,
+                      AwsIotShadowCallbackParam_t * pCallbackParam )
+{
+    ESP_LOGI(TAG, "_updateComplete");
+}
+
 esp_err_t eLabConnectionUpdateShadow(AwsIotShadowDocumentInfo_t *updateDocument)
 {
     int status = EXIT_SUCCESS;
-    AwsIotShadowError_t updateStatus = AWS_IOT_SHADOW_STATUS_PENDING;
+    AwsIotShadowError_t updateStatus = AWS_IOT_SHADOW_STATUS_PENDING;    
+    AwsIotShadowCallbackInfo_t updateCallback = AWS_IOT_SHADOW_CALLBACK_INFO_INITIALIZER;
+    updateCallback.function = _updateComplete;
 
-    IotSemaphore_Wait(&shadowDeltaSem);
-
-    updateStatus = AwsIotShadow_TimedUpdate(_mqttConnection,
-                                            updateDocument,
-                                            AWS_IOT_SHADOW_FLAG_KEEP_SUBSCRIPTIONS,
-                                            MQTT_TIMEOUT_MS);
+    updateStatus = AwsIotShadow_Update(_mqttConnection, updateDocument, AWS_IOT_SHADOW_FLAG_KEEP_SUBSCRIPTIONS,
+                                        &updateCallback, NULL);
 
     /* Check the status of the Shadow update. */
-    if (updateStatus != AWS_IOT_SHADOW_SUCCESS)
+    if (updateStatus != AWS_IOT_SHADOW_STATUS_PENDING)
     {
         ESP_LOGE(TAG, "Failed to send Shadow update, error %s.", AwsIotShadow_strerror(updateStatus));
         status = EXIT_FAILURE;
     }
     else
     {
-        ESP_LOGD(TAG, "Successfully sent Shadow update.");
+        ESP_LOGI(TAG, "Successfully queued Shadow update.");
     }
-
-    IotSemaphore_Post(&shadowDeltaSem);
 
     return status;
 }
@@ -749,3 +824,23 @@ bool bIsLabConnectionMqttConnected(void)
 {
     return mqttConnectionEstablished;
 }
+
+/*-----------------------------------------------------------*/
+
+esp_err_t eLabConnectionRegisterCallback(void (*callback)(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data) )
+{
+    esp_err_t res = ESP_FAIL;
+    if (lab_connection_event_loop)
+    {
+        res = esp_event_handler_register_with(lab_connection_event_loop, LAB_CONNECTION_EVENT_BASE, ESP_EVENT_ANY_ID, callback, NULL);
+        ESP_LOGI(TAG, "eLabConnectionRegisterCallback: Callback registered... %s", res == ESP_OK ? "OK" : "NOK");    
+    }
+    else
+    {
+        ESP_LOGE(TAG, "eLabConnectionRegisterCallback: lab_conenction_event_loop is NULL");
+    }
+    
+    return res;
+}
+
+/*-----------------------------------------------------------*/
