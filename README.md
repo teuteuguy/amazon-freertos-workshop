@@ -41,8 +41,7 @@ screen [YOUR SERIALPORT] 115200 -L
 
 Or everything in one line: 
 ```bash
-cmake -S . -B build -DIDF_SDKCONFIG_DEFAULTS=./sdkconfig -DCMAKE_TOOLCHAIN_FILE=amazon-freertos/tools/cmake/toolchains/xtensa-esp32.cmake -G
-Ninja && ESPPORT=[YOUR SERIALPORT] ESPBAUD=1500000 cmake --build build --target flash && screen [YOUR SERIALPORT] 115200 -L
+cmake -S . -B build -DIDF_SDKCONFIG_DEFAULTS=./sdkconfig -DCMAKE_TOOLCHAIN_FILE=amazon-freertos/tools/cmake/toolchains/xtensa-esp32.cmake -GNinja && ESPPORT=[YOUR SERIALPORT] ESPBAUD=1500000 cmake --build build --target flash && screen [YOUR SERIALPORT] 115200 -L
 ```
 
 Note: the workshop currently supports 2 devices, ESP32 DevkitC and the M5StickC. Choose your device by editing the `./include/lab_config.h` header file.

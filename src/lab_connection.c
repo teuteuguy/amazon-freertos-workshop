@@ -40,6 +40,7 @@
 
 #include "aws_iot_network_config.h"
 
+#include "device.h"
 #include "lab_config.h"
 #include "lab_connection.h"
 

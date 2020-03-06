@@ -35,6 +35,7 @@
 #include "types/iot_network_types.h"
 #include "esp_log.h"
 
+#include "device.h"
 #include "lab_config.h"
 #include "lab_connection.h"
 #include "lab2_shadow.h"
@@ -479,7 +480,7 @@ static void prvAirConTask( void * pvParameters )
 
 /*-----------------------------------------------------------*/
 
-void prvConnectionEventHandler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
+void prvLab2ConnectionEventHandler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
 {
     ESP_LOGI(TAG, "prvConnectionEventHandler: %i", id);
     if (id == LABCONNECTION_NETWORK_CONNECTED)
@@ -535,7 +536,7 @@ esp_err_t eLab2Init(const char *const strID)
         return res;
     }
 
-    res = eLabConnectionRegisterCallback(prvConnectionEventHandler);
+    res = eLabConnectionRegisterCallback(prvLab2ConnectionEventHandler);
 
     if (res == ESP_OK)
     {

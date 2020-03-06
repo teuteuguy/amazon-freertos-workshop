@@ -28,9 +28,9 @@
 #include "esp_log.h"
 #include "esp_event.h"
 
+#include "device.h"
 #include "lab_config.h"
 #include "workshop.h"
-#include "device.h"
 
 /* Declaration of demo functions. */
 #if defined(LABCONFIG_LAB1_AWS_IOT_BUTTON) || defined(LABCONFIG_LAB2_SHADOW)

@@ -11,6 +11,7 @@
 #include "esp_err.h"
 #include "esp_event.h"
 #include "iot_mqtt.h"
+#include "aws_demo.h"
 #include "aws_iot_shadow.h"
 
 /**

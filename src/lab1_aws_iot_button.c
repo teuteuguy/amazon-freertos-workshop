@@ -29,6 +29,7 @@
 #include "types/iot_network_types.h"
 #include "esp_log.h"
 
+#include "device.h"
 #include "lab_config.h"
 #include "lab_connection.h"
 #include "lab1_aws_iot_button.h"

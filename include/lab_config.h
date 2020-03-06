@@ -28,6 +28,11 @@
 
 #define LABCONFIG_LAB0_DO_NOTHING
 
-#include "device.h"
+
+/* If you want to allow WIFI provisioning to be managed by mobile apps.
+ * Uncomment following #define.
+ * Note: the wifi provisioning apps on Android or iOS are required.*/
+
+// #define LABCONFIG_WIFI_PROVISION_VIA_BLE
 
 #endif /* ifndef _LAB_CONFIG_H_ */
