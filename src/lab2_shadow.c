@@ -35,11 +35,10 @@
 #include "types/iot_network_types.h"
 #include "esp_log.h"
 
+#include "device.h"
 #include "lab_config.h"
 #include "lab_connection.h"
 #include "lab2_shadow.h"
-
-#include "m5stickc.h"
 
 static const char *TAG = "lab2_shadow";
 
@@ -107,10 +106,12 @@ typedef struct {
 
 shadowState_t shadowStateReported = {
     .powerOn = 0,
-    .temperature = 35};
+    .temperature = 35
+};
 shadowState_t shadowStateDesired = {
     .powerOn = 0,
-    .temperature = 0};
+    .temperature = 0
+};
 
 /**
  * @brief The expected size of #SHADOW_REPORTED_JSON.
@@ -122,31 +123,8 @@ shadowState_t shadowStateDesired = {
 
 /*-----------------------------------------------------------*/
 
-static const TickType_t xAirConRefreshTimerFrequency_ms = 10000UL;
-static TimerHandle_t xAirCon;
-
-static void prvAirConTimerCallback(TimerHandle_t pxTimer);
-
-/*-----------------------------------------------------------*/
-
-void vLab2NetworkConnectedCallback(bool awsIotMqttMode,
-                               const char *pIdentifier,
-                               void *pNetworkServerInfo,
-                               void *pNetworkCredentialInfo,
-                               const IotNetworkInterface_t *pNetworkInterface)
-{
-    ESP_LOGD(TAG, "vNetworkConnectedCallback for %s", pIdentifier);
-
-    /* Start the AirCon */
-    xAirCon = xTimerCreate("AirConRefresh", pdMS_TO_TICKS(xAirConRefreshTimerFrequency_ms), pdTRUE, (void *)pIdentifier, prvAirConTimerCallback);
-    xTimerStart(xAirCon, 0);
-}
-
-void vLab2NetworkDisconnectedCallback(const IotNetworkInterface_t *pNetworkInterface)
-{
-    ESP_LOGI(TAG, "vNetworkDisconnectedCallback");
-    lab_connection_cleanup();
-}
+static TaskHandle_t xAirConTaskHandle;
+static void prvAirConTask( void *pvParameters );
 
 /*-----------------------------------------------------------*/
 
@@ -295,12 +273,7 @@ static int _reportShadow(const char *const pThingName)
     }
     else
     {
-        status = EXIT_SUCCESS;
-    }
-
-    if (status == EXIT_SUCCESS)
-    {
-        status = lab_connection_update_shadow(&updateDocument);
+        status = eLabConnectionUpdateShadow(&updateDocument);
     }
 
     return status;
@@ -360,7 +333,7 @@ static void _shadowDeltaCallback(void *pCallbackContext,
     if (temperatureDeltaFound == true)
     {
         uint8_t newTemperature = (uint8_t)atoi(pTemperatureDelta);
-        IotLogDebug("Shadow delta: temperature: %u vs. %u", newTemperature, shadowStateDesired.temperature);
+        IotLogInfo("Shadow delta: temperature: %u vs. %u", newTemperature, shadowStateDesired.temperature);
         /* Change the current state based on the value in the delta document. */
         if (newTemperature != shadowStateDesired.temperature)
         {            
@@ -448,73 +421,133 @@ static void _shadowUpdatedCallback(void *pCallbackContext,
 
 /*-----------------------------------------------------------*/
 
-static void prvAirConTimerCallback(TimerHandle_t pxTimer)
+static void prvAirConTask( void * pvParameters )
 {
-    int status = EXIT_SUCCESS;
-    configASSERT(pxTimer);
-
-    char *pThingName = (char *)pvTimerGetTimerID(pxTimer);
-
     // Used for the screen.
     char pAirConStr[11] = {0};
+    char * pThingName = (char *)pvParameters;
 
-    if (shadowStateReported.powerOn == 1)
-    {
-        shadowStateReported.temperature--;
-        if (shadowStateReported.temperature < shadowStateDesired.temperature)
+    ESP_LOGI(TAG, "prvAirConTask: Starting the AirCon task for: %s", pThingName);
+
+    for(;;)
+    {        
+        int status = EXIT_SUCCESS;
+
+        if (shadowStateReported.powerOn == 1)
         {
-            shadowStateReported.temperature = shadowStateDesired.temperature;
+            shadowStateReported.temperature--;
+            if (shadowStateReported.temperature < shadowStateDesired.temperature)
+            {
+                shadowStateReported.temperature = shadowStateDesired.temperature;
+            }
+
+            ESP_LOGI(TAG, "prvAirConTask: AirCon is ON => Temp (%u) needs to decrease to target (%u)",
+                    shadowStateReported.temperature,
+                    shadowStateDesired.temperature);
+
+            status = snprintf(pAirConStr, 11, " ON %02u", shadowStateReported.temperature);
+        }
+        else
+        {
+            shadowStateReported.temperature++;
+            if (shadowStateReported.temperature > 40)
+            {
+                shadowStateReported.temperature = 40;
+            }
+
+            ESP_LOGI(TAG, "prvAirConTask: AirCon is OFF => Temp (%u) increases", shadowStateReported.temperature);
+
+            status = snprintf(pAirConStr, 11, "OFF %02u", shadowStateReported.temperature);
         }
 
-        ESP_LOGI(TAG, "Timer: AirCon is ON => Temp (%u) needs to decrease to target (%u)",
-                shadowStateReported.temperature,
-                shadowStateDesired.temperature);
-
-        status = snprintf(pAirConStr, 11, " ON %02u", shadowStateReported.temperature);
-    }
-    else
-    {
-        shadowStateReported.temperature++;
-        if (shadowStateReported.temperature > 40)
+        if (status >= 0)
         {
-            shadowStateReported.temperature = 40;
+            DISPLAY_PRINT(pAirConStr, DISPLAY_WIDTH - 6 * 9, DISPLAY_HEIGHT - 13);
+        }
+        
+        /* Report Shadow. */
+        status = _reportShadow(pThingName);
+        if (status != EXIT_SUCCESS)
+        {
+            ESP_LOGE(TAG, "prvAirConTask: Failed to report the shadow.");
         }
 
-        ESP_LOGI(TAG, "Timer: AirCon is OFF => Temp (%u) increases", shadowStateReported.temperature);
-
-        status = snprintf(pAirConStr, 11, "OFF %02u", shadowStateReported.temperature);
+        vTaskDelay( pdMS_TO_TICKS( 10000 ) );
     }
 
-    if (status >= 0)
-    {
-        TFT_print(pAirConStr, M5STICKC_DISPLAY_WIDTH - 6 * 9, M5STICKC_DISPLAY_HEIGHT - 13);
-    }
-    
-    /* Report Shadow. */
-    status = _reportShadow(pThingName);
-
-    if (status != EXIT_SUCCESS)
-    {
-        IotLogError("Timer: Failed to report shadow.");
-    }
-
+    vTaskDelete( NULL );
 }
-
 
 /*-----------------------------------------------------------*/
 
-void lab2_init(const char *const strID)
+void prvLab2ConnectionEventHandler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
 {
+    ESP_LOGI(TAG, "prvConnectionEventHandler: %i", id);
+    if (id == LABCONNECTION_NETWORK_CONNECTED)
+    {
+    }
+    else if (id == LABCONNECTION_NETWORK_DISCONNECTED)
+    {
+    }
+    else if (id == LABCONNECTION_MQTT_CONNECTED)
+    {
+        char * thingName = ((connection_event_params_t *)event_data)->thingName;
+        ESP_LOGI(TAG, "LABCONNECTION_MQTT_CONNECTED: %s (%i)", thingName, strlen(thingName));
+
+        /* Create the AirCon task */
+        xTaskCreate( prvAirConTask,			    /* The function that implements the task. */
+                    "AirCon",    				/* The text name assigned to the task - for debug only as it is not used by the kernel. */
+                    2048,		                /* The size of the stack to allocate to the task. */
+                    thingName,                  /* The parameter passed to the task. */
+                    0,				            /* The priority assigned to the task. */
+                    &xAirConTaskHandle );	    /* The task handle is used to obtain the name of the task. */
+    }
+    else if (id == LABCONNECTION_MQTT_DISCONNECTED)
+    {
+        vTaskDelete( xAirConTaskHandle );
+    }
+}
+
+/*-----------------------------------------------------------*/
+
+esp_err_t eLab2Init(const char *const strID)
+{
+    esp_err_t res = ESP_FAIL;
+
+    ESP_LOGI(TAG, "eLab2Init: Init");
+
     static iot_connection_params_t connectionParams;
 
     connectionParams.strID = (char *)strID;
     connectionParams.useShadow = true;
-    connectionParams.networkConnectedCallback = vLab2NetworkConnectedCallback;
-    connectionParams.networkDisconnectedCallback = vLab2NetworkDisconnectedCallback;
+    connectionParams.networkConnectedCallback = NULL;
+    connectionParams.networkDisconnectedCallback = NULL;
     connectionParams.shadowDeltaCallback = _shadowDeltaCallback;
     connectionParams.shadowUpdatedCallback = _shadowUpdatedCallback;
 
-    lab_connection_init(&connectionParams);
+    res = eLabConnectionInit(&connectionParams);
+    if (res == ESP_OK)
+    {
+        ESP_LOGI(TAG, "eLab2Init: Initialized the connection");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "eLab2Init: Failed to initialize the connection");
+        return res;
+    }
+
+    res = eLabConnectionRegisterCallback(prvLab2ConnectionEventHandler);
+
+    if (res == ESP_OK)
+    {
+        ESP_LOGI(TAG, "eLab2Init: Registered connection callbacks for Lab2");        
+    }
+    else
+    {
+        ESP_LOGE(TAG, "eLab2Init: Failed to register the callbacks");
+    }
+    
+    return res;
 }
 
 /*-----------------------------------------------------------*/

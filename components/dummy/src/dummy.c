@@ -1,6 +1,6 @@
 #include <iot_mqtt.h>
 
-int foo()
+int dummy()
 {
     return 100;
 }
