@@ -2,13 +2,23 @@
 	path = amazon-freertos
 	url = https://github.com/aws/amazon-freertos.git
 	branch = master
-	
+
 [submodule "components/afr-m5stickc-bsp"]
 	path = components/afr-m5stickc-bsp
 	url = https://github.com/teuteuguy/afr-m5stickc-bsp.git
 	branch = master
 
-[submodule "components/afr-m5stack-bsp"]
-	path = components/afr-m5stack-bsp
-	url = https://github.com/teuteuguy/afr-m5stack-bsp.git
+[submodule "components/afr-bmp280"]
+	path = components/afr-bmp280
+	url = https://github.com/teuteuguy/afr-bmp280
+	branch = master
+
+[submodule "components/afr-dht12"]
+	path = components/afr-dht12
+	url = https://github.com/teuteuguy/afr-dht12
+	branch = master
+
+[submodule "components/afr-mpu6886"]
+	path = components/afr-mpu6886
+	url = https://github.com/teuteuguy/afr-mpu6886
 	branch = master

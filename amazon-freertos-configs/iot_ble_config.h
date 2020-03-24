@@ -14,7 +14,7 @@
 #if defined(LABCONFIG_WIFI_PROVISION_VIA_BLE)
 
 /* Device name for this peripheral device. */
-#define IOT_BLE_DEVICE_COMPLETE_LOCAL_NAME      "My Awesome Device"
+#define IOT_BLE_DEVICE_COMPLETE_LOCAL_NAME      "ESP32"
 
 /* Enable WIFI provisioning GATT service. */
 #define IOT_BLE_ENABLE_WIFI_PROVISIONING         ( 1 )

@@ -26,7 +26,7 @@
  *
  * These defines will be used throughout the workshop code. */
 
-#define LABCONFIG_LAB0_DO_NOTHING
+#define LABCONFIG_LAB1_AWS_IOT_BUTTON
 
 
 /* If you want to allow WIFI provisioning to be managed by mobile apps.
@@ -34,5 +34,19 @@
  * Note: the wifi provisioning apps on Android or iOS are required.*/
 
 // #define LABCONFIG_WIFI_PROVISION_VIA_BLE
+
+
+
+/* Uncomment some of the following if you extra capabilities based on
+ * extra shields and addons.
+ * 
+ *          ADDON_BMP280 - Adds BMP280 capabilities
+ *          ADDON_MPU6886 - Adds MPU6886 capabilities
+ * 
+ * */
+
+// #define ADDON_BMP280
+#define ADDON_MPU6886
+
 
 #endif /* ifndef _LAB_CONFIG_H_ */

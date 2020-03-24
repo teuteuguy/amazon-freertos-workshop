@@ -40,6 +40,8 @@
     #include "lab2_shadow.h"
 #endif
 
+#include "addons.h"
+
 #include "lab_connection.h"
 
 /*-----------------------------------------------------------*/
@@ -148,7 +150,7 @@ esp_err_t eWorkshopInit(void)
             res = eDeviceRegisterButtonCallback(BUTTON_MAIN_EVENT_BASE, prvWorkshopMainButtonEventHandler);
             if (res != ESP_OK)
             {
-                ESP_LOGE(TAG, "eWorkshopInit: Register main button ... failed");
+                ESP_LOGE( TAG, "eWorkshopInit: Register main button ... failed" );
             }
         #endif // defined(DEVICE_HAS_MAIN_BUTTON)
 
@@ -156,12 +158,28 @@ esp_err_t eWorkshopInit(void)
             res = eDeviceRegisterButtonCallback(BUTTON_RESET_EVENT_BASE, prvWorkshopResetButtonEventHandler);
             if (res !=  ESP_OK)
             {
-                ESP_LOGE(TAG, "eWorkshopInit: Register reset button ... failed");
+                ESP_LOGE( TAG, "eWorkshopInit: Register reset button ... failed" );
             }
         #endif // defined(DEVICE_HAS_RESET_BUTTON)
 
+        #if defined(ADDON_BMP280)
+            res = eAddonBmp280Init();
+            if (res != ESP_OK)
+            {
+                ESP_LOGE( TAG, "eWorkshopInit: Initialisation of BMP280 addon ... failed" );
+            }
+        #endif
+
+        #if defined(ADDON_MPU6886)
+            res = eAddonMPU6886Init();
+            if (res != ESP_OK)
+            {
+                ESP_LOGE( TAG, "eWorkshopInit: Initialisation of MPU6886 addon ... failed" );
+            }
+        #endif
+
         /* Init the labs */
-        res = LAB_INIT( strMACAddr );
+        // res = LAB_INIT( strMACAddr );
 
         if (res == ESP_OK) {
             ESP_LOGI(TAG, "eWorkshopInit: ... done");
