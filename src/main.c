@@ -56,8 +56,8 @@
     #include "iot_ble_numericComparison.h"
 #endif
 
-/* Demonstrate use of component dummy. */
-#include <dummy.h>
+/* Demonstrate use of custom module foo. */
+#include "foo.h"
 
 #include "workshop.h"
 
@@ -285,7 +285,7 @@ int app_main( void )
     if( SYSTEM_Init() == pdPASS )
     {
 
-        configPRINTF( ( "Calling Dummy Component: %d\n", dummy() ));
+        configPRINTF( ( "Calling Foo Module: %d\n", foo() ));
 
         /* A simple example to demonstrate key and certificate provisioning in
          * microcontroller flash using PKCS#11 interface. This should be replaced

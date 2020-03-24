@@ -16,8 +16,6 @@ include_directories(
 set(IDF_PROJECT_EXECUTABLE afr_workshop)
 
 # Add some extra components. IDF_EXTRA_COMPONENT_DIRS is an variable used by ESP-IDF to collect extra components.
-get_filename_component( EXTRA_COMPONENT_DIRS "components/dummy" ABSOLUTE )
-list( APPEND IDF_EXTRA_COMPONENT_DIRS ${EXTRA_COMPONENT_DIRS} )
 get_filename_component( EXTRA_COMPONENT_DIRS "components/afr-esp32devkitc-bsp" ABSOLUTE )
 list( APPEND IDF_EXTRA_COMPONENT_DIRS ${EXTRA_COMPONENT_DIRS} )
 get_filename_component( EXTRA_COMPONENT_DIRS "components/afr-m5stickc-bsp" ABSOLUTE )
@@ -32,9 +30,15 @@ include_directories(BEFORE amazon-freertos-configs)
 set(AFR_BOARD espressif.esp32_devkitc CACHE INTERNAL "")
 add_subdirectory(amazon-freertos)
 
+# Demonstrate how to add a dummy module that depends on AFR based modules.
+add_subdirectory( "components/foo" )
+list( APPEND SENSOR_LIBS foo )
+list( APPEND SENSOR_INCLUDES "components/foo/include" )
+
+message("")
 message("=============================== SENSORS =================================")
 add_subdirectory( "components/afr-mpu6886" )
-list( APPEND SENSOR_LIBS sensor::mpu6886 )
+list( APPEND SENSOR_LIBS mpu6886 )
 list( APPEND SENSOR_INCLUDES "components/afr-mpu6886/include" )
 message("=========================================================================")
 
@@ -43,17 +47,12 @@ message("=======================================================================
 target_link_libraries(
     afr_workshop 
     PRIVATE 
+        AFR::common
+        AFR::common_io
         AFR::demo_ble_numeric_comparison
         AFR::demo_mqtt
-        AFR::common_io
-        AFR::shadow
         AFR::demo_wifi_provisioning
+        AFR::shadow
     PRIVATE
         ${SENSOR_LIBS}
 )
-
-# target_include_directories(
-#     afr_workshop
-#     PUBLIC
-#         ${SENSOR_INCLUDES}
-# )
