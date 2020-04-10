@@ -1,5 +1,5 @@
 /*
-* FreeRTOS
+ * FreeRTOS V202002.00
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -23,35 +23,36 @@
  * http://www.FreeRTOS.org
  */
 
-
 /**
- * @file aws_iot_network_config.h
- * @brief Configuration file which enables different network types.
- */
-#ifndef AWS_IOT_NETWORK_CONFIG_H_
-#define AWS_IOT_NETWORK_CONFIG_H_
-
-/**
- * @brief Configuration flag used to specify all supported network types by the board.
- *
- * The configuration is fixed per board and should never be changed.
- * More than one network interfaces can be enabled by using 'OR' operation with flags for
- * each network types supported. Flags for all supported network types can be found
- * in "aws_iot_network.h"
+ * @file iot_demo_logging.h
+ * @brief Sets the log level for all demos.
  */
 
-#define configSUPPORTED_NETWORKS    ( AWSIOT_NETWORK_TYPE_WIFI | AWSIOT_NETWORK_TYPE_BLE )
+#ifndef IOT_DEMO_LOGGING_H_
+#define IOT_DEMO_LOGGING_H_
 
-/**
- * @brief Configuration flag which is used to enable one or more network interfaces for a board.
- *
- * The configuration can be changed any time to keep one or more network enabled or disabled.
- * More than one network interfaces can be enabled by using 'OR' operation with flags for
- * each network types supported. Flags for all supported network types can be found
- * in "aws_iot_network.h"
- *
+/* The config header is always included first. */
+#include "iot_config.h"
+
+/* Configure logs for the demos. The demos will have a log level of:
+ * - IOT_LOG_LEVEL_DEMO if defined.
+ * - IOT_LOG_LEVEL_GLOBAL if defined and IOT_LOG_LEVEL_DEMO is undefined.
+ * - IOT_LOG_NONE if neither IOT_LOG_LEVEL_DEMO nor IOT_LOG_LEVEL_GLOBAL are defined.
  */
+#ifdef IOT_LOG_LEVEL_DEMO
+    #define LIBRARY_LOG_LEVEL        IOT_LOG_LEVEL_DEMO
+#else
+    #ifdef IOT_LOG_LEVEL_GLOBAL
+        #define LIBRARY_LOG_LEVEL    IOT_LOG_LEVEL_GLOBAL
+    #else
+        #define LIBRARY_LOG_LEVEL    IOT_LOG_NONE
+    #endif
+#endif
 
-#define configENABLED_NETWORKS      ( AWSIOT_NETWORK_TYPE_WIFI | AWSIOT_NETWORK_TYPE_BLE )
+/* Set the library name to print with the demos. */
+#define LIBRARY_LOG_NAME    ( "DEMO" )
 
-#endif /* CONFIG_FILES_AWS_IOT_NETWORK_CONFIG_H_ */
+/* Include the logging setup header. This enables the logs. */
+#include "iot_logging_setup.h"
+
+#endif /* ifndef IOT_DEMO_LOGGING_H_ */

@@ -164,12 +164,12 @@ void prvLabConnectionEventHandler(void * handler_arg, esp_event_base_t base, int
     if (id == LABCONNECTION_NETWORK_CONNECTED)
     {
         ESP_LOGI(TAG, "LABCONNECTION_NETWORK_CONNECTED");
-        STATUS_LED_ON();
+        DEVICE_STATUS_LED_ON();
     }
     else if (id == LABCONNECTION_NETWORK_DISCONNECTED)
     {
         ESP_LOGI(TAG, "LABCONNECTION_NETWORK_DISCONNECTED");
-        STATUS_LED_OFF();
+        DEVICE_STATUS_LED_OFF();
     }
     else if (id == LABCONNECTION_MQTT_CONNECTED)
     {

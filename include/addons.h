@@ -8,30 +8,50 @@
 #ifndef _ADDONS_H_
 #define _ADDONS_H_
 
-#include "esp_err.h"
-
+#include "iot_i2c.h"
 #include "lab_config.h"
+
+typedef int32_t addons_err_t;
+
+/**
+ * @brief   ADDONS FAILURE CODES
+ */
+#define ADDONS_SUCCESS             ( 0 )     /** Operation completed successfully. */
+#define ADDONS_FAIL                ( 1 )     /** Operation failed. */
+#define ADDONS_OTHER_ERROR         ( 2 )     /** Other error. */
+
 
 #if defined( ADDON_BMP280 )
 
-typedef struct {
-    double temperature;
-    double pressure;
-    double sealevel;
-    double altitude;
+    typedef struct {
+        float temperature;
+        float pressure;
+        float seaLevel;
+        float altitude;
+    } addon_bmp280_sensors_t;
 
-    double rawTemperature;
-    double rawPressure;
-} addon_bmp280_sensors_t;
-
-esp_err_t eAddonBmp280Init( void );
-esp_err_t eAddonBmp280GetSensors( addon_bmp280_sensors_t * sensors );
+    addons_err_t eAddonBmp280Init( IotI2CHandle_t const handle );
+    addons_err_t eAddonBmp280GetSensors( addon_bmp280_sensors_t * sensors, float current_altitude, float base_pressure );
 
 #endif /* defined( ADDON_BMP280 ) */
 
 #if defined( ADDON_MPU6886 )
 
-esp_err_t eAddonMPU6886Init( void );
+    typedef struct {
+        float accel_x;
+        float accel_y;
+        float accel_z;
+        float gyro_x;
+        float gyro_y;
+        float gyro_z;
+        float temperature;
+        float pitch;
+        float roll;
+        float yaw;
+    } addon_mpu6886_sensors_t;
+
+    addons_err_t eAddonMPU6886Init( IotI2CHandle_t const handle );
+    addons_err_t eAddonMPU6886GetSensors( addon_mpu6886_sensors_t * sensors );
 
 #endif /* defined( ADDON_MPU6886 ) */
 

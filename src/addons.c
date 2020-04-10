@@ -13,27 +13,44 @@
 
 static const char *TAG = "addons";
 
+#define ADDONS_IO_CHECK_HANDLER( handler ) if ( handler == NULL ) { ESP_LOGE(TAG, "IO Handler is NULL"); return ADDONS_FAIL; }
+
 #if defined( ADDON_BMP280 )
 
 #include "bmp280.h"
 
 /*-----------------------------------------------------------*/
 
-esp_err_t eAddonBmp280Init( void )
+addons_err_t eAddonBmp280Init( IotI2CHandle_t const handle )
 {
-    esp_err_t res = ESP_FAIL;
-    ESP_LOGI(TAG, "eAddonBmp280Init: Init");
-
-    return res;
+    ADDONS_IO_CHECK_HANDLER( handle );
+    ESP_LOGD( TAG, "eAddonBmp280Init: Init" );
+    if ( eBmp280Init( handle ) != BMP280_SUCCESS )
+    {
+        return ADDONS_FAIL;
+    }
+    return ADDONS_SUCCESS;
 }
 
 /*-----------------------------------------------------------*/
 
-esp_err_t eAddonBmp280GetSensors( addon_bmp280_sensors_t * sensors )
+addons_err_t eAddonBmp280GetSensors( addon_bmp280_sensors_t * sensors, float current_altitude, float base_pressure )
 {
-    esp_err_t res = ESP_FAIL;
+    if ( eBmp280GetTemperatureAndPressure( &(sensors->temperature), &(sensors->pressure) ) != BMP280_SUCCESS )
+    {
+        return ADDONS_FAIL;
+    }
+    
+    sensors->seaLevel = fBmp280GetSeaLevel( sensors->pressure, current_altitude );
+    sensors->altitude = fBmp280GetAltitude( sensors->pressure, base_pressure );
 
-    return res;
+    ESP_LOGD(TAG, "eAddonBmp280GetSensors: Temperature(%f)  Pressure(%f) SeaLevel(%f) Altitude(%f)", 
+            sensors->temperature,
+            sensors->pressure,
+            sensors->seaLevel,
+            sensors->altitude);
+
+    return ADDONS_SUCCESS;
 }
 
 /*-----------------------------------------------------------*/
@@ -47,14 +64,44 @@ esp_err_t eAddonBmp280GetSensors( addon_bmp280_sensors_t * sensors )
 
 /*-----------------------------------------------------------*/
 
-esp_err_t eAddonMPU6886Init( void )
+addons_err_t eAddonMPU6886Init( IotI2CHandle_t const handle )
 {
-    esp_err_t res = ESP_FAIL;
-    ESP_LOGI( TAG, "eAddonMPU6886Init: Init" );
+    ADDONS_IO_CHECK_HANDLER( handle );
+    ESP_LOGD( TAG, "eAddonMPU6886Init: Init" );
+    if ( eMPU6886Init( handle ) != MPU6886_SUCCESS )
+    {
+        return ADDONS_FAIL;
+    }
+    return ADDONS_SUCCESS;
+}
 
-    res = eMPU6886Init( NULL );
+addons_err_t eAddonMPU6886GetSensors( addon_mpu6886_sensors_t * sensors )
+{
+    if ( eGetMPU6886AccelData( &(sensors->accel_x), &(sensors->accel_y), &(sensors->accel_z) ) != MPU6886_SUCCESS )
+    {
+        return ADDONS_FAIL;
+    }
+    if ( eGetMPU6886GyroData( &(sensors->gyro_x), &(sensors->gyro_y), &(sensors->gyro_z) ) != MPU6886_SUCCESS )
+    {
+        return ADDONS_FAIL;
+    }
+    if ( eGetMPU6886TempData( &(sensors->temperature) ) != MPU6886_SUCCESS )
+    {
+        return ADDONS_FAIL;
+    }
+    if ( eGetMPU6886AhrsData( &(sensors->pitch), &(sensors->roll), &(sensors->yaw) ) != MPU6886_SUCCESS )
+    {
+        return ADDONS_FAIL;
+    }
 
-    return res;
+    ESP_LOGD( TAG, "eAddonMPU6886GetSensors: Accel(%f, %f, %f)  Gyro(%f, %f, %f) Temp(%f) AHRS(%f, %f, %f)", 
+                sensors->accel_x, sensors->accel_y, sensors->accel_z,
+                sensors->gyro_x, sensors->gyro_y, sensors->gyro_z,
+                sensors->temperature,
+                sensors->pitch, sensors->roll, sensors->yaw );
+
+
+    return ADDONS_SUCCESS;
 }
 
 /*-----------------------------------------------------------*/

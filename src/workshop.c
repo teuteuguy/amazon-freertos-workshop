@@ -54,6 +54,10 @@ uint8_t uMACAddr[6] = { 0 };
 #define MAC_ADDRESS_STR_LENGTH ( sizeof(uMACAddr) * 2 + 1 )
 char strMACAddr[MAC_ADDRESS_STR_LENGTH] = "";
 
+device_t prvDeviceConfig = {
+    .i2c_handler = { NULL, NULL }
+};
+
 /*-----------------------------------------------------------*/
 
 esp_err_t eWorkshopInit(void);
@@ -141,13 +145,11 @@ esp_err_t eWorkshopInit(void)
 
     ESP_LOGI(TAG, "eWorkshopInit: ... ===================================");
 
-    res = eDeviceInit();
-
-    if (res ==  ESP_OK)
+    if ( eDeviceInit( &prvDeviceConfig ) ==  DEVICE_SUCCESS )
     {
-
+        
         #if defined(DEVICE_HAS_MAIN_BUTTON)
-            res = eDeviceRegisterButtonCallback(BUTTON_MAIN_EVENT_BASE, prvWorkshopMainButtonEventHandler);
+            res = eDeviceRegisterButtonCallback( BUTTON_MAIN_EVENT_BASE, prvWorkshopMainButtonEventHandler );
             if (res != ESP_OK)
             {
                 ESP_LOGE( TAG, "eWorkshopInit: Register main button ... failed" );
@@ -155,39 +157,23 @@ esp_err_t eWorkshopInit(void)
         #endif // defined(DEVICE_HAS_MAIN_BUTTON)
 
         #if defined(DEVICE_HAS_RESET_BUTTON)
-            res = eDeviceRegisterButtonCallback(BUTTON_RESET_EVENT_BASE, prvWorkshopResetButtonEventHandler);
+            res = eDeviceRegisterButtonCallback( BUTTON_RESET_EVENT_BASE, prvWorkshopResetButtonEventHandler );
             if (res !=  ESP_OK)
             {
                 ESP_LOGE( TAG, "eWorkshopInit: Register reset button ... failed" );
             }
         #endif // defined(DEVICE_HAS_RESET_BUTTON)
 
-        #if defined(ADDON_BMP280)
-            res = eAddonBmp280Init();
-            if (res != ESP_OK)
-            {
-                ESP_LOGE( TAG, "eWorkshopInit: Initialisation of BMP280 addon ... failed" );
-            }
-        #endif
-
-        #if defined(ADDON_MPU6886)
-            res = eAddonMPU6886Init();
-            if (res != ESP_OK)
-            {
-                ESP_LOGE( TAG, "eWorkshopInit: Initialisation of MPU6886 addon ... failed" );
-            }
-        #endif
-
         /* Init the labs */
-        // res = LAB_INIT( strMACAddr );
-
-        if (res == ESP_OK) {
+        if ( LAB_INIT( strMACAddr ) == ESP_OK )
+        {
             ESP_LOGI(TAG, "eWorkshopInit: ... done");
+            res = ESP_OK;            
         }
         else
         {
             ESP_LOGE(TAG, "eWorkshopInit: Init labs ... failed");
-        }
+        }        
     }
     else
     {

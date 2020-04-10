@@ -22,3 +22,6 @@
 	path = components/afr-mpu6886
 	url = https://github.com/teuteuguy/afr-mpu6886
 	branch = master
+[submodule "components/afr-axp192"]
+	path = components/afr-axp192
+	url = https://github.com/teuteuguy/afr-axp192

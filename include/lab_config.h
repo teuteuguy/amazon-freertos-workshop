@@ -8,6 +8,8 @@
 #ifndef _LAB_CONFIG_H_
 #define _LAB_CONFIG_H_
 
+#include "driver/i2c.h"
+
 /* First step, choose the device you plan on running the labs on.
  *
  *          DEVICE_ESP32_DEVKITC
@@ -26,7 +28,7 @@
  *
  * These defines will be used throughout the workshop code. */
 
-#define LABCONFIG_LAB1_AWS_IOT_BUTTON
+#define LABCONFIG_LAB0_DO_NOTHING
 
 
 /* If you want to allow WIFI provisioning to be managed by mobile apps.
@@ -45,8 +47,7 @@
  * 
  * */
 
-// #define ADDON_BMP280
-#define ADDON_MPU6886
-
+// #define ADDON_MPU6886    I2C_NUM_0  // On IRC port 0
+// #define ADDON_BMP280     I2C_NUM_1  // On IRC port 1
 
 #endif /* ifndef _LAB_CONFIG_H_ */
