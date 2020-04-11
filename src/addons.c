@@ -15,8 +15,6 @@ static const char *TAG = "addons";
 
 #define ADDONS_IO_CHECK_HANDLER( handler ) if ( handler == NULL ) { ESP_LOGE(TAG, "IO Handler is NULL"); return ADDONS_FAIL; }
 
-#if defined( ADDON_BMP280 )
-
 #include "bmp280.h"
 
 /*-----------------------------------------------------------*/
@@ -54,11 +52,6 @@ addons_err_t eAddonBmp280GetSensors( addon_bmp280_sensors_t * sensors, float cur
 }
 
 /*-----------------------------------------------------------*/
-
-#endif // ADDON_BMP280
-
-
-#if defined( ADDON_MPU6886 )
 
 #include "mpu6886.h"
 
@@ -105,5 +98,3 @@ addons_err_t eAddonMPU6886GetSensors( addon_mpu6886_sensors_t * sensors )
 }
 
 /*-----------------------------------------------------------*/
-
-#endif // ADDON_MPU6886

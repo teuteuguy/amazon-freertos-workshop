@@ -16,10 +16,13 @@
 
 #include "lab_config.h"
 
+#include "m5_display.h"
+
 #define DEVICE_STATUS_LED_ON()
 #define DEVICE_STATUS_LED_OFF()
 
 #define DISPLAY_PRINT( str, x, y )
+#define DISPLAY_DRAWLINE(x1, y1, x2, y2, color)
 #define DISPLAY_WIDTH
 #define DISPLAY_HEIGHT
 
@@ -82,8 +85,10 @@ extern esp_event_loop_handle_t device_event_loop;       /*!< Event loop for devi
     ESP_EVENT_DECLARE_BASE( BUTTON_MAIN_EVENT_BASE )    /*!< BASE event of button A */
     extern device_button_t device_button_a;             /*!< Button A */
 
-#elif defined(DEVICE_M5STICKC)
-    
+#endif
+
+#if defined(DEVICE_M5STICKC)
+
     #define DEVICE_HAS_ACCELEROMETER
     #undef ADDON_MPU6886
     #define ADDON_MPU6886               I2C_NUM_0
@@ -103,13 +108,14 @@ extern esp_event_loop_handle_t device_event_loop;       /*!< Event loop for devi
     extern device_button_t device_button_a;             /*!< Button A is the button on the front of M5StickC */
     extern device_button_t device_button_b;             /*!< Button B is the button on the side of M5StickC, far from the USB connector */
 
-    // #undef DISPLAY_PRINT
-    // #define DISPLAY_PRINT(str, x, y) TFT_print(str, x, y)
-    // #undef DISPLAY_WIDTH
-    // #define DISPLAY_WIDTH M5STICKC_DISPLAY_WIDTH
-    // #undef DISPLAY_HEIGHT
-    // #define DISPLAY_HEIGHT M5STICKC_DISPLAY_HEIGHT
-
+    #undef DISPLAY_PRINT
+    #define DISPLAY_PRINT(str, x, y) eM5DisplayPrint(str, x, y)
+    #undef DISPLAY_DRAWLINE
+    #define DISPLAY_DRAWLINE(x1, y1, x2, y2, color) eM5DisplayDrawLine(x1, y1, x2, y2, color)
+    #undef DISPLAY_WIDTH
+    #define DISPLAY_WIDTH M5STICKC_DISPLAY_WIDTH
+    #undef DISPLAY_HEIGHT
+    #define DISPLAY_HEIGHT M5STICKC_DISPLAY_HEIGHT
 
 
     #include "axp192.h"
@@ -205,5 +211,7 @@ extern esp_event_loop_handle_t device_event_loop;       /*!< Event loop for devi
 esp_err_t eDeviceInit( device_t * config );
 esp_err_t eDeviceRegisterButtonCallback(esp_event_base_t base, void (*callback)(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data) );
 device_err_t eDeviceSetLed( uint8_t port, uint32_t value );
+
+#include "addons.h"
 
 #endif /* ifndef _DEVICE_H_ */

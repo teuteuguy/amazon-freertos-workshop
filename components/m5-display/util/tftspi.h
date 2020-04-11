@@ -160,7 +160,8 @@ extern "C" {
   #define PIN_NUM_BCKL 0  	// GPIO used for backlight control
   #define PIN_BCKL_ON  1  	// GPIO value for backlight ON
   #define PIN_BCKL_OFF 0  	// GPIO value for backlight OFF
-
+  // ---------------------------------------------------------
+  
 #else
 
   // Configuration for other boards, set the correct values for the display used

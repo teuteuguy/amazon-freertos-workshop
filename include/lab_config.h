@@ -43,11 +43,9 @@
  * extra shields and addons.
  * 
  *          ADDON_BMP280 - Adds BMP280 capabilities
- *          ADDON_MPU6886 - Adds MPU6886 capabilities
  * 
  * */
 
-// #define ADDON_MPU6886    I2C_NUM_0  // On IRC port 0
 // #define ADDON_BMP280     I2C_NUM_1  // On IRC port 1
 
 #endif /* ifndef _LAB_CONFIG_H_ */

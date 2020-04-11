@@ -1,24 +1,24 @@
 /**
- * m5stickc_display.c
+ * m5_display.c
  *
  * (C) 2020 - Timothee Cruse <timothee.cruse@gmail.com>
  * This code is licensed under the MIT License.
  */
-#include "m5stickc_display.h"
+#include "m5_display.h"
 #include "timers.h"
 
-static const char * TAG = "m5stickc_display";
+static const char * TAG = "m5_display";
 
-spi_lobo_device_handle_t m5stickc_display_spi;
-TimerHandle_t m5stickc_display_timer;
+spi_lobo_device_handle_t m5_display_spi;
+TimerHandle_t m5_display_timer;
 
-esp_err_t M5StickCDisplayInit( void )
+esp_err_t eM5DisplayInit( void )
 {
     esp_err_t e;
 
     tft_disp_type = M5STICKC_DISPLAY_TYPE;
-    _width = 80;                                        // smaller dimension
-    _height = 160;                                      // larger dimension    
+    _width = M5STICKC_DISPLAY_HEIGHT;                   // smaller dimension
+    _height = M5STICKC_DISPLAY_WIDTH;                   // larger dimension    
     // max_rdclock = 8000000;
     max_rdclock = 25000000;
 
@@ -40,17 +40,17 @@ esp_err_t M5StickCDisplayInit( void )
     devcfg.spics_ext_io_num=PIN_NUM_CS;                 // external CS pin
     devcfg.flags=LB_SPI_DEVICE_HALFDUPLEX;              // ALWAYS SET  to HALF DUPLEX MODE!! for display spi
 
-    e = spi_lobo_bus_add_device(TFT_HSPI_HOST, &buscfg, &devcfg, &m5stickc_display_spi);
+    e = spi_lobo_bus_add_device(TFT_HSPI_HOST, &buscfg, &devcfg, &m5_display_spi);
     if(e != ESP_OK) {
         ESP_LOGE(TAG, "Error adding display to SPI bus: %s", esp_err_to_name(e));
         return ESP_FAIL;
     }
 
-    disp_spi = m5stickc_display_spi;
+    disp_spi = m5_display_spi;
 
     // ==== Test select/deselect ====
-    spi_lobo_device_select(m5stickc_display_spi, 1);
-    spi_lobo_device_deselect(m5stickc_display_spi);
+    spi_lobo_device_select(m5_display_spi, 1);
+    spi_lobo_device_deselect(m5_display_spi);
 
     // Pin reset
     gpio_set_level((gpio_num_t) PIN_NUM_RST, 1);
@@ -63,7 +63,7 @@ esp_err_t M5StickCDisplayInit( void )
     TFT_invertDisplay(INVERT_ON);
 
     // ==== Set SPI clock used for display operations ====
-    spi_lobo_set_speed(m5stickc_display_spi, DEFAULT_SPI_CLOCK);
+    spi_lobo_set_speed(m5_display_spi, DEFAULT_SPI_CLOCK);
 
     font_rotate = 0;
     text_wrap = 0;
@@ -77,6 +77,19 @@ esp_err_t M5StickCDisplayInit( void )
 
     return ESP_OK;
 }
+
+esp_err_t eM5DisplayPrint( char * str, int x, int y )
+{
+    TFT_print(str, x, y);
+    return ESP_OK;
+}
+
+esp_err_t eM5DisplayDrawLine( int x1, int y1, int x2, int y2, color_t color )
+{
+    TFT_drawLine(x1, y1, x2, y2, color);
+    return ESP_OK;
+}
+
 
 // esp_err_t M5StickCDisplaySetBacklightLevel(uint8_t backlight_level) {
 //     esp_err_t e;
@@ -104,7 +117,7 @@ esp_err_t M5StickCDisplayInit( void )
 // {
 //     esp_err_t e;
 
-//     e = esp_event_handler_register_with(m5stickc_event_loop, M5STICKC_BUTTON_A_EVENT_BASE, ESP_EVENT_ANY_ID, M5StickCDisplayEventHandler, NULL);
+//     e = esp_event_handler_register_with(m5_event_loop, M5_BUTTON_A_EVENT_BASE, ESP_EVENT_ANY_ID, M5StickCDisplayEventHandler, NULL);
 //     if(e == ESP_OK) {
 //         ESP_LOGD(TAG, "[ OK ] Registered for event BUTTON_A_CLICK");
 //     } else {
@@ -112,7 +125,7 @@ esp_err_t M5StickCDisplayInit( void )
 //         return ESP_FAIL;
 //     }
 
-//     e = esp_event_handler_register_with(m5stickc_event_loop, M5STICKC_BUTTON_B_EVENT_BASE, ESP_EVENT_ANY_ID, M5StickCDisplayEventHandler, NULL);
+//     e = esp_event_handler_register_with(m5_event_loop, M5_BUTTON_B_EVENT_BASE, ESP_EVENT_ANY_ID, M5StickCDisplayEventHandler, NULL);
 //     if(e == ESP_OK) {
 //         ESP_LOGD(TAG, "[ OK ] Registered for event BUTTON_B_CLICK");
 //     } else {
@@ -121,15 +134,15 @@ esp_err_t M5StickCDisplayInit( void )
 //     }
 
 //     // Activate timer
-//     m5stickc_display_timer = xTimerCreate("m5stickc_display_timer", timeout * 1000 / portTICK_PERIOD_MS, pdFALSE, (void *) 0, M5StickCDisplaySleep);
-//     if(m5stickc_display_timer != NULL) {
+//     m5_display_timer = xTimerCreate("m5_display_timer", timeout * 1000 / portTICK_PERIOD_MS, pdFALSE, (void *) 0, M5StickCDisplaySleep);
+//     if(m5_display_timer != NULL) {
 //         ESP_LOGD(TAG, "[ OK ] Display timeout timer created");
 //     } else {
 //         ESP_LOGE(TAG, "[FAIL] Error creating display timeout timer");
 //         return ESP_FAIL;
 //     }
 
-//     if(xTimerStart(m5stickc_display_timer, 0) == pdTRUE) {
+//     if(xTimerStart(m5_display_timer, 0) == pdTRUE) {
 //         ESP_LOGD(TAG, "[ OK ] Display timeout timer started");
 //         return ESP_OK;
 //     } else {
@@ -141,7 +154,7 @@ esp_err_t M5StickCDisplayInit( void )
 // void M5StickCDisplayWakeup()
 // {
 //     M5StickCDisplayOn();
-//     if(xTimerReset(m5stickc_display_timer, 0) == pdTRUE) {
+//     if(xTimerReset(m5_display_timer, 0) == pdTRUE) {
 //         ESP_LOGD(TAG, "[ OK ] Display timeout timer reset");
 //     } else {
 //         ESP_LOGE(TAG, "[FAIL] Error resetting display timeout timer");
@@ -155,7 +168,7 @@ esp_err_t M5StickCDisplayInit( void )
 
 // void M5StickCDisplayEventHandler(void * handler_arg, esp_event_base_t base, int32_t id, void * event_data)
 // {
-//     if(base == M5STICKC_BUTTON_A_EVENT_BASE || base == M5STICKC_BUTTON_B_EVENT_BASE) {
+//     if(base == M5_BUTTON_A_EVENT_BASE || base == M5_BUTTON_B_EVENT_BASE) {
 //         M5StickCDisplayWakeup();
 //     }
 // }

@@ -3,11 +3,6 @@
 	url = https://github.com/aws/amazon-freertos.git
 	branch = master
 
-[submodule "components/afr-m5stickc-bsp"]
-	path = components/afr-m5stickc-bsp
-	url = https://github.com/teuteuguy/afr-m5stickc-bsp.git
-	branch = master
-
 [submodule "components/afr-bmp280"]
 	path = components/afr-bmp280
 	url = https://github.com/teuteuguy/afr-bmp280

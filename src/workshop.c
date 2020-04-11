@@ -40,8 +40,6 @@
     #include "lab2_shadow.h"
 #endif
 
-#include "addons.h"
-
 #include "lab_connection.h"
 
 /*-----------------------------------------------------------*/

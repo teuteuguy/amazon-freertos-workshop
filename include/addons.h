@@ -20,39 +20,30 @@ typedef int32_t addons_err_t;
 #define ADDONS_FAIL                ( 1 )     /** Operation failed. */
 #define ADDONS_OTHER_ERROR         ( 2 )     /** Other error. */
 
+typedef struct {
+    float temperature;
+    float pressure;
+    float seaLevel;
+    float altitude;
+} addon_bmp280_sensors_t;
 
-#if defined( ADDON_BMP280 )
+addons_err_t eAddonBmp280Init( IotI2CHandle_t const handle );
+addons_err_t eAddonBmp280GetSensors( addon_bmp280_sensors_t * sensors, float current_altitude, float base_pressure );
 
-    typedef struct {
-        float temperature;
-        float pressure;
-        float seaLevel;
-        float altitude;
-    } addon_bmp280_sensors_t;
+typedef struct {
+    float accel_x;
+    float accel_y;
+    float accel_z;
+    float gyro_x;
+    float gyro_y;
+    float gyro_z;
+    float temperature;
+    float pitch;
+    float roll;
+    float yaw;
+} addon_mpu6886_sensors_t;
 
-    addons_err_t eAddonBmp280Init( IotI2CHandle_t const handle );
-    addons_err_t eAddonBmp280GetSensors( addon_bmp280_sensors_t * sensors, float current_altitude, float base_pressure );
-
-#endif /* defined( ADDON_BMP280 ) */
-
-#if defined( ADDON_MPU6886 )
-
-    typedef struct {
-        float accel_x;
-        float accel_y;
-        float accel_z;
-        float gyro_x;
-        float gyro_y;
-        float gyro_z;
-        float temperature;
-        float pitch;
-        float roll;
-        float yaw;
-    } addon_mpu6886_sensors_t;
-
-    addons_err_t eAddonMPU6886Init( IotI2CHandle_t const handle );
-    addons_err_t eAddonMPU6886GetSensors( addon_mpu6886_sensors_t * sensors );
-
-#endif /* defined( ADDON_MPU6886 ) */
+addons_err_t eAddonMPU6886Init( IotI2CHandle_t const handle );
+addons_err_t eAddonMPU6886GetSensors( addon_mpu6886_sensors_t * sensors );
 
 #endif /* ifndef _ADDONS_H_ */

@@ -806,7 +806,7 @@ void _tft_setRotation(uint8_t rot) {
     #elif TFT_INVERT_ROTATION1
     switch (rotation) {
         case PORTRAIT:
-        madctl = (MADCTL_MY | MADCTL_MX | TFT_RGB_BGR); // TFT_MAD_MH missing?? see m5stickc arduino code https://github.com/yishii/M5StickC/blob/01e2aebc95def57aab3fef7c64956c3ca702bad7/src/utility/ST7735_Rotation.h
+        madctl = (MADCTL_MY | MADCTL_MX | TFT_RGB_BGR); // TFT_MAD_MH missing?? see m5 arduino code https://github.com/yishii/M5StickC/blob/01e2aebc95def57aab3fef7c64956c3ca702bad7/src/utility/ST7735_Rotation.h
         break;
         case LANDSCAPE:
         madctl = (MADCTL_MY | MADCTL_MV | TFT_RGB_BGR);

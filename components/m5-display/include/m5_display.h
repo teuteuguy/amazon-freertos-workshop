@@ -1,12 +1,12 @@
 /**
- * m5stickc_display.h
+ * m5_display.h
  *
  * (C) 2020 - Timothee Cruse <timothee.cruse@gmail.com>
  * This code is licensed under the MIT License.
  */
 
-#ifndef _M5STICKC_DISPLAY_H_
-#define _M5STICKC_DISPLAY_H_
+#ifndef _M5_DISPLAY_H_
+#define _M5_DISPLAY_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,8 +18,8 @@ extern "C" {
 #include "util/tftspi.h"
 #include "util/tft.h"
 
-#define M5STICKC_DISPLAY_TYPE DISP_TYPE_ST7735S         /*!< Display type for display driver */
-#define M5STICKC_DISPLAY_WIDTH 160                      /*!< Display width in pixels after rotation */
+#define M5STICKC_DISPLAY_TYPE   DISP_TYPE_ST7735S       /*!< Display type for display driver */
+#define M5STICKC_DISPLAY_WIDTH  160                     /*!< Display width in pixels after rotation */
 #define M5STICKC_DISPLAY_HEIGHT 80                      /*!< Display height in pixels after rotation */
 
 // Defines for global variables of the TFT Library
@@ -32,7 +32,7 @@ extern "C" {
 #define TFT_FONT_BACKGROUND     _bg
 #define TFT_FONT_FOREGROUND     _fg
 
-extern spi_lobo_device_handle_t m5stickc_display_spi;   /*!< SPI device handle */
+extern spi_lobo_device_handle_t m5_display_spi;   /*!< SPI device handle */
 
 /**
  * @brief   Initialize display
@@ -40,7 +40,10 @@ extern spi_lobo_device_handle_t m5stickc_display_spi;   /*!< SPI device handle *
  * @return  ESP_OK success
  *          ESP_FAIL failed
  */
-esp_err_t M5StickCDisplayInit( void );
+esp_err_t eM5DisplayInit( void );
+
+esp_err_t eM5DisplayPrint( char * str, int x, int y );
+esp_err_t eM5DisplayDrawLine( int x1, int y1, int x2, int y2, color_t color );
 
 // /**
 //  * @brief   Set display backlight level
@@ -82,4 +85,4 @@ esp_err_t M5StickCDisplayInit( void );
 }
 #endif
 
-#endif // _M5STICKC_DISPLAY_H_
+#endif // _M5_DISPLAY_H_

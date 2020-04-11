@@ -6,15 +6,10 @@
  * This code is licensed under the MIT License.
  */
 
-#include "device.h"
-
 #include "freertos/FreeRTOS.h"
-
-#include "m5stickc_display.h"
 #include "esp_log.h"
 
-#include "addons.h"
-
+#include "device.h"
 
 /*-----------------------------------------------------------*/
 
@@ -343,7 +338,7 @@ device_err_t eDeviceInit( device_t * config )
             return DEVICE_FAIL;
         }
 
-        if ( M5StickCDisplayInit() != ESP_OK )
+        if ( eM5DisplayInit() != ESP_OK )
         {
             ESP_LOGE(TAG, "eDeviceInit: Error Initializing display");
             return DEVICE_FAIL;
@@ -616,7 +611,7 @@ esp_err_t eDeviceRegisterButtonCallback(esp_event_base_t base, void (*callback)(
                     else
                     {
                         ESP_LOGD(TAG, "prvBatteryTask: Charging str(%i): \"%s\"", status, pVbatStr);
-                        TFT_print(pVbatStr, 1, M5STICKC_DISPLAY_HEIGHT - 13);
+                        DISPLAY_PRINT( pVbatStr, 1, M5STICKC_DISPLAY_HEIGHT - 13 );
                     }
                 }
 
@@ -657,21 +652,21 @@ esp_err_t eDeviceRegisterButtonCallback(esp_event_base_t base, void (*callback)(
             #define SCREEN_LINE_3  SCREEN_OFFSET + 2 * SCREEN_LINE_HEIGHT
             #define SCREEN_LINE_4  SCREEN_OFFSET + 3 * SCREEN_LINE_HEIGHT
 
-            TFT_print((char *)"AWS & FreeRTOS", CENTER, SCREEN_LINE_1);
-            TFT_print((char *)"workshop", CENTER, SCREEN_LINE_2);
+            DISPLAY_PRINT((char *)"AWS & FreeRTOS", CENTER, SCREEN_LINE_1);
+            DISPLAY_PRINT((char *)"workshop", CENTER, SCREEN_LINE_2);
 
             #if defined(LABCONFIG_LAB0_DO_NOTHING)
-                TFT_print((char *)"LAB0 - DOES NOTHING", CENTER, SCREEN_LINE_4);
+                DISPLAY_PRINT((char *)"LAB0 - DOES NOTHING", CENTER, SCREEN_LINE_4);
                 ESP_LOGI( TAG, "eDeviceDisplayInit: LAB0 - DOES NOTHING" );
             #elif defined(LABCONFIG_LAB1_AWS_IOT_BUTTON)
-                TFT_print((char *)"LAB1 - AWS IOT BUTTON", CENTER, SCREEN_LINE_4);
+                DISPLAY_PRINT((char *)"LAB1 - AWS IOT BUTTON", CENTER, SCREEN_LINE_4);
                 ESP_LOGI( TAG, "eDeviceDisplayInit: LAB1 - AWS IOT BUTTON" );
             #elif defined(LABCONFIG_LAB2_SHADOW)
-                TFT_print((char *)"LAB2 - THING SHADOW", CENTER, SCREEN_LINE_4);
+                DISPLAY_PRINT((char *)"LAB2 - THING SHADOW", CENTER, SCREEN_LINE_4);
                 ESP_LOGI( TAG, "eDeviceDisplayInit: LAB2 - THING SHADOW" );
             #endif
 
-            TFT_drawLine(0, M5STICKC_DISPLAY_HEIGHT - 13 - 3, M5STICKC_DISPLAY_WIDTH, M5STICKC_DISPLAY_HEIGHT - 13 - 3, TFT_ORANGE);
+            DISPLAY_DRAWLINE(0, DISPLAY_HEIGHT - 13 - 3, DISPLAY_WIDTH, DISPLAY_HEIGHT - 13 - 3, TFT_ORANGE);
 
             return DEVICE_SUCCESS;
         }

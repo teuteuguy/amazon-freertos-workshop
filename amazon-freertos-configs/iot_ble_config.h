@@ -13,19 +13,19 @@
 
 #if defined(LABCONFIG_WIFI_PROVISION_VIA_BLE)
 
-/* Device name for this peripheral device. */
-#define IOT_BLE_DEVICE_COMPLETE_LOCAL_NAME      "ESP32"
+    /* Device name for this peripheral device. */
+    #define IOT_BLE_DEVICE_COMPLETE_LOCAL_NAME      "ESP32"
 
-/* Enable WIFI provisioning GATT service. */
-#define IOT_BLE_ENABLE_WIFI_PROVISIONING         ( 1 )
-#define IOT_BLE_ENABLE_GATT_DEMO                 ( 0 )
+    /* Enable WIFI provisioning GATT service. */
+    #define IOT_BLE_ENABLE_WIFI_PROVISIONING         ( 1 )
+    #define IOT_BLE_ENABLE_GATT_DEMO                 ( 0 )
 
-/* Disable numeric comparison */
-#define IOT_BLE_ENABLE_NUMERIC_COMPARISON        ( 0 )
-#define IOT_BLE_ENABLE_SECURE_CONNECTION         ( 0 )
-#define IOT_BLE_INPUT_OUTPUT                     ( eBTIONone )
+    /* Disable numeric comparison */
+    #define IOT_BLE_ENABLE_NUMERIC_COMPARISON        ( 0 )
+    #define IOT_BLE_ENABLE_SECURE_CONNECTION         ( 0 )
+    #define IOT_BLE_INPUT_OUTPUT                     ( eBTIONone )
 
-#define IOT_BLE_ENCRYPTION_REQUIRED               ( 0 )
+    #define IOT_BLE_ENCRYPTION_REQUIRED               ( 0 )
 
 #endif
 
